@@ -1,0 +1,30 @@
+name = "ubi"
+category = "filesystem"
+
+# UBI erase-count header ("UBI#") and volume-id header ("UBI!"). version == 1.
+struct = """
+  bytes[4] magic;
+  u8 version;
+"""
+
+constraints = [
+  "version == 1",
+]
+
+confidence = "structural"
+coalesce = true
+
+validator = "ubi"
+
+[[magic]]
+ascii = "UBI#"
+endian = "big"
+[[magic]]
+ascii = "UBI!"
+endian = "big"
+
+[doc]
+description = "UBI (Unsorted Block Images) volume on raw NAND flash."
+references = [
+  { title = "UBI documentation", url = "http://www.linux-mtd.infradead.org/doc/ubi.html" },
+]

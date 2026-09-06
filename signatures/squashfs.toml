@@ -1,0 +1,63 @@
+# NOTE: all root-level keys must precede the first [[magic]] / [doc] table,
+# else TOML attaches them to that table instead of the root.
+name = "squashfs"
+category = "filesystem"
+
+struct = """
+  bytes[4] s_magic;
+  u32 inodes;
+  u32 mkfs_time;
+  u32 block_size;
+  u32 fragments;
+  u16 compression;
+  u16 block_log;
+  u16 flags;
+  u16 no_ids;
+  u16 s_major;
+  u16 s_minor;
+  u64 root_inode;
+  u64 bytes_used;
+  u64 id_table_start;
+"""
+
+# Covers v4 (s_major == 4). Legacy v1-3 will be a separate definition.
+constraints = [
+  "s_major == 4",
+  "inodes > 0",
+  "block_log in 10..20",
+  "block_size == 1 << block_log",
+  "bytes_used > 0",
+  "bytes_used <= _avail",
+]
+
+size = "bytes_used"
+validator = "squashfs"   # sets compression/version, bumps to `consistent`
+
+# All seven known SquashFS magics; endianness drives header parsing.
+[[magic]]
+ascii = "hsqs"
+endian = "little"
+[[magic]]
+ascii = "sqsh"
+endian = "big"
+[[magic]]
+ascii = "sqlz"
+endian = "big"
+[[magic]]
+ascii = "qshs"
+endian = "big"
+[[magic]]
+ascii = "tqsh"
+endian = "big"
+[[magic]]
+ascii = "hsqt"
+endian = "little"
+[[magic]]
+ascii = "shsq"
+endian = "little"
+
+[doc]
+description = "SquashFS compressed read-only filesystem, common in embedded Linux firmware."
+references = [
+  { title = "SquashFS Binary Format", url = "https://dr-emann.github.io/squashfs/" },
+]

@@ -1,0 +1,20 @@
+name = "rpi_eeprom"
+category = "bootloader"
+
+# Raspberry Pi bootloader EEPROM image. Distinctive 4-byte header magic.
+struct = """
+  bytes[4] magic;
+  u32 length;
+"""
+
+confidence = "structural"
+
+[[magic]]
+hex = "55aaf00f"
+endian = "little"
+
+[doc]
+description = "Raspberry Pi bootloader EEPROM image (pieeprom)."
+references = [
+  { title = "rpi-eeprom", url = "https://github.com/raspberrypi/rpi-eeprom" },
+]

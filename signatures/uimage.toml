@@ -1,0 +1,35 @@
+name = "uimage"
+category = "container"
+
+struct = """
+  u32 ih_magic;
+  u32 ih_hcrc;
+  u32 ih_time;
+  u32 ih_size;
+  u32 ih_load;
+  u32 ih_ep;
+  u32 ih_dcrc;
+  u8  ih_os;
+  u8  ih_arch;
+  u8  ih_type;
+  u8  ih_comp;
+  bytes[32] ih_name;
+"""
+
+constraints = [
+  "ih_size + 64 <= _avail",
+]
+
+size = "ih_size + 64"          # 64-byte header + payload
+validator = "uimage"           # verifies header CRC32 -> `verified`, decodes arch/comp/name
+
+# U-Boot legacy uImage. 64-byte big-endian header with a header CRC32.
+[[magic]]
+hex = "27051956"
+endian = "big"
+
+[doc]
+description = "U-Boot legacy uImage: kernel/ramdisk container with a CRC-checked header."
+references = [
+  { title = "U-Boot image format (image.h)", url = "https://source.denx.de/u-boot/u-boot/-/blob/master/include/image.h" },
+]

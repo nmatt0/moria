@@ -1,0 +1,33 @@
+name = "dlink_shrs"
+category = "encrypted"
+
+# SHRS header: 4-byte magic, then a big-endian u32 encrypted-data size at +8. The
+# `deobf` validator does the real work (first-block AES probe to confirm a working
+# key and size the finding); the constraint here is just a sanity gate.
+struct = """
+  bytes[4] magic;
+  skip[4];
+  u32 enc_size;
+"""
+
+constraints = [
+  "enc_size > 0",
+  "enc_size <= 268435456",
+]
+
+confidence = "structural"
+
+# Refine to verified + full span when the fixed AES-128 key decrypts to a uImage.
+validator = "deobf"
+
+# "SHRS" — D-Link AES-128-CBC encrypted firmware (fixed key, IV in the header).
+[[magic]]
+ascii = "SHRS"
+endian = "big"
+
+[doc]
+description = "D-Link SHRS AES-128-CBC encrypted firmware (offline-decryptable)."
+references = [
+  { title = "delink (D-Link firmware decryption)", url = "https://github.com/devttys0/delink" },
+  { title = "dlink-decrypt (SHRS PoC)", url = "https://github.com/0xricksanchez/dlink-decrypt" },
+]

@@ -1,0 +1,38 @@
+name = "btrfs"
+category = "filesystem"
+
+# btrfs superblock at 64 KiB (0x10000); its magic '_BHRfS_M' sits at +0x40, i.e.
+# file offset 0x10040. Little-endian.
+magic_offset = 65600
+
+struct = """
+  skip[65600];
+  bytes[8] magic;
+  skip[40];
+  u64 total_bytes;
+  skip[24];
+  u32 sectorsize;
+  u32 nodesize;
+"""
+
+constraints = [
+  "sectorsize in 512..65536",
+  "(sectorsize & (sectorsize - 1)) == 0",
+  "nodesize in 512..262144",
+  "(nodesize & (nodesize - 1)) == 0",
+  "total_bytes > 0",
+]
+
+size = "total_bytes"
+size_clamp = true
+confidence = "consistent"
+
+[[magic]]
+hex = "5f42485266535f4d"
+endian = "little"
+
+[doc]
+description = "btrfs filesystem (Linux copy-on-write B-tree filesystem, NAS/appliance and desktop images)."
+references = [
+  { title = "btrfs on-disk format", url = "https://btrfs.readthedocs.io/en/latest/dev/On-disk-format.html" },
+]

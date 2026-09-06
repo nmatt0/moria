@@ -1,0 +1,31 @@
+name = "lz4_legacy"
+category = "compression"
+
+# Legacy frame has no FLG descriptor; the magic is followed straight by the first
+# block: a u32 little-endian compressed-block size. Bound it to LZ4_compressBound
+# of the 8 MiB legacy block (a real first block cannot exceed it, and must be
+# non-empty), which excludes a stray 0x184C2102 from a random byte stream.
+struct = """
+  skip[4];
+  u32 first_block_size;
+"""
+
+constraints = [
+  "first_block_size > 0",
+  "first_block_size <= 8421520",
+]
+
+confidence = "structural"
+
+# LZ4 legacy frame format: 4-byte magic 0x184C2102 (little-endian 02 21 4c 18).
+# Predates the LZ4 frame spec; still used for Android boot/init_boot/vendor_boot
+# ramdisks. Distinct from the modern frame (04 22 4d 18), which lz4.toml matches.
+[[magic]]
+hex = "02214c18"
+endian = "little"
+
+[doc]
+description = "LZ4 legacy-frame compressed data (Android ramdisks and similar)."
+references = [
+  { title = "LZ4 Frame Format (Legacy frame appendix)", url = "https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md" },
+]

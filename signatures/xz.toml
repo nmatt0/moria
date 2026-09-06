@@ -1,0 +1,27 @@
+name = "xz"
+category = "compression"
+
+struct = """
+  skip[6];
+  u8 sf0;
+  u8 sf1;
+"""
+
+# Stream flags byte 0 is reserved (must be 0); byte 1 high nibble is reserved.
+constraints = [
+  "sf0 == 0",
+  "sf1 < 16",
+]
+
+confidence = "structural"
+
+# xz stream header: 6-byte magic, then 2 stream-flag bytes.
+[[magic]]
+hex = "fd377a585a00"
+endian = "little"
+
+[doc]
+description = "xz-compressed data (LZMA2 stream)."
+references = [
+  { title = "xz file format", url = "https://tukaani.org/xz/xz-file-format.txt" },
+]

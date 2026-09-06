@@ -1,0 +1,20 @@
+name = "bmp"
+category = "image"
+short = true
+
+struct = """
+  bytes[2] magic;
+  u32 file_size;
+"""
+constraints = [ "file_size >= 54" ]
+size = "file_size"
+size_clamp = true
+confidence = "structural"
+
+[[magic]]
+ascii = "BM"
+endian = "little"
+
+[doc]
+description = "BMP (Windows bitmap) image."
+references = [ { title = "BMP format", url = "https://learn.microsoft.com/windows/win32/gdi/bitmap-storage" } ]

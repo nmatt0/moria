@@ -1,0 +1,1101 @@
+# Firmware-vendor magic-tier signatures for moria.
+# Byte patterns and offsets are facts about real firmware formats.
+# Descriptions are original (name + identifying magic + offset); no
+# third-party prose is reproduced. See THIRD_PARTY.md for provenance.
+
+[[signature]]
+name = "dahua_firmware_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "44480304", endian = "little" } ]
+doc = { description = "Dahua Firmware Image; identifying magic 0x44480304 at offset 0" }
+
+[[signature]]
+name = "ros_container"
+category = "generic"
+magic_offset = 24
+short = true
+magic = [ { hex = "5041434b", endian = "little" } ]
+doc = { description = "ROS Container; identifying magic \"PACK\" at offset 24" }
+
+[[signature]]
+name = "tp_link_wr702n_image"
+category = "generic"
+magic_offset = 20
+short = true
+magic = [ { hex = "494d47300017", endian = "little" } ]
+doc = { description = "TP Link Wr702n Image; identifying magic 0x494d47300017 at offset 20" }
+
+[[signature]]
+name = "img0_vxworks_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "494d4730", endian = "little" } ]
+doc = { description = "IMG0 VxWorks Header; identifying magic \"IMG0\" at offset 0" }
+
+[[signature]]
+name = "mediatek_bootloader"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "424f4f544c4f4144455221", endian = "little" } ]
+doc = { description = "MediaTek Bootloader; identifying magic \"BOOTLOADER!\" at offset 0" }
+
+[[signature]]
+name = "csys_header_little_endian"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4353595300", endian = "little" } ]
+doc = { description = "CSYS Header Little Endian; identifying magic 0x4353595300 at offset 0" }
+
+[[signature]]
+name = "csys_header_big_endian"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4353595380", endian = "little" } ]
+doc = { description = "CSYS Header Big Endian; identifying magic 0x4353595380 at offset 0" }
+
+[[signature]]
+name = "wrgg_firmware_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "777267673032", endian = "little" } ]
+doc = { description = "WRGG Firmware Header; identifying magic \"wrgg02\" at offset 0" }
+
+[[signature]]
+name = "netgear_chk_firmware_container"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "2a23245e", endian = "little" } ]
+doc = { description = "Netgear CHK Firmware Container; identifying magic \"*#$^\" at offset 0" }
+
+[[signature]]
+name = "trx_firmware_header_little_endian"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "48445230", endian = "little" } ]
+doc = { description = "TRX Firmware Header Little Endian; identifying magic \"HDR0\" at offset 0" }
+
+[[signature]]
+name = "bin_header"
+category = "generic"
+magic_offset = 14
+short = true
+magic = [ { hex = "55324e44", endian = "little" } ]
+doc = { description = "BIN Header; identifying magic \"U2ND\" at offset 14" }
+
+[[signature]]
+name = "realtek_firmware_header_rome_bootloader"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "47363134", endian = "little" } ]
+doc = { description = "Realtek Firmware Header Rome Bootloader; identifying magic \"G614\" at offset 0" }
+
+[[signature]]
+name = "packimg_section_delimiter_tag"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "2d2d5061436b496d4773", endian = "little" } ]
+doc = { description = "PackImg Section Delimiter TAG; identifying magic \"--PaCkImGs\" at offset 0" }
+
+[[signature]]
+name = "broadcom_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4243524d", endian = "little" } ]
+doc = { description = "Broadcom Header; identifying magic \"BCRM\" at offset 0" }
+
+[[signature]]
+name = "broadcom_firmware_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "38000000", endian = "little" } ]
+doc = { description = "Broadcom Firmware Header; identifying magic 0x38000000 at offset 0" }
+
+[[signature]]
+name = "blcr"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "436b30000052000000", endian = "little" } ]
+doc = { description = "BLCR; identifying magic 0x436b30000052000000 at offset 0" }
+
+[[signature]]
+name = "blcr"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "0000004300000052", endian = "little" } ]
+doc = { description = "BLCR; identifying magic 0x0000004300000052 at offset 0" }
+
+[[signature]]
+name = "aculab_voip_firmware"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "566f4950205374617274757020616e64", endian = "little" } ]
+doc = { description = "Aculab VoIP Firmware; identifying magic \"VoIP Startup and\" at offset 0" }
+
+[[signature]]
+name = "marvell_libertas_firmware"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "01000000000000c000020000", endian = "little" } ]
+doc = { description = "Marvell Libertas Firmware; identifying magic 0x01000000000000c000020000 at offset 0" }
+
+[[signature]]
+name = "paged_cobalt_boot_rom"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "436f62616c74204e6574776f726b7320496e632e0a4669726d776172652076", endian = "little" } ]
+doc = { description = "Paged COBALT Boot Rom; identifying magic 0x436f62616c74204e6574776f726b7320496e632e0a4669726d776172652076 at offset 0" }
+
+[[signature]]
+name = "cobalt_boot_rom_data_flat_boot_rom_or_fi"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "43526673", endian = "little" } ]
+doc = { description = "COBALT Boot Rom Data Flat Boot Rom Or Fi; identifying magic \"CRfs\" at offset 0" }
+
+[[signature]]
+name = "windows_ce_image_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "423030304646", endian = "little" } ]
+doc = { description = "Windows CE Image Header; identifying magic \"B000FF\" at offset 0" }
+
+[[signature]]
+name = "windows_ce_memory_segment_header"
+category = "generic"
+magic_offset = 63
+short = true
+magic = [ { hex = "0045434543", endian = "little" } ]
+doc = { description = "Windows CE Memory Segment Header; identifying magic 0x0045434543 at offset 63" }
+
+[[signature]]
+name = "cisco_vxworks_firmware_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "43493033322e3030", endian = "little" } ]
+doc = { description = "Cisco VxWorks Firmware Header; identifying magic \"CI032.00\" at offset 0" }
+
+[[signature]]
+name = "zboot_firmware_header_header_size_32_byt"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "464e4942", endian = "little" } ]
+doc = { description = "ZBOOT Firmware Header Header Size 32 Byt; identifying magic \"FNIB\" at offset 0" }
+
+[[signature]]
+name = "dlob_firmware_header_jump_108"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "5ea3a417", endian = "little" } ]
+doc = { description = "DLOB Firmware Header Jump 108; identifying magic 0x5ea3a417 at offset 0" }
+
+[[signature]]
+name = "tp_link_firmware_header"
+category = "generic"
+magic_offset = 4
+short = true
+magic = [ { hex = "54502d4c494e4b20546563686e6f6c6f67696573", endian = "little" } ]
+doc = { description = "TP Link Firmware Header; identifying magic \"TP-LINK Technologies\" at offset 4" }
+
+[[signature]]
+name = "broadcom_96345_firmware_header_header_si"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "36000000", endian = "little" } ]
+doc = { description = "Broadcom 96345 Firmware Header Header Si; identifying magic 0x36000000 at offset 0" }
+
+[[signature]]
+name = "xerox_dlm_firmware_start_of_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "2525585258626567696e", endian = "little" } ]
+doc = { description = "Xerox Dlm Firmware Start Of Header; identifying magic \"%%XRXbegin\" at offset 0" }
+
+[[signature]]
+name = "xerox_dlm_firmware_name"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "25254f49445f4154545f444c4d5f4e414d45", endian = "little" } ]
+doc = { description = "Xerox Dlm Firmware Name; identifying magic \"%%OID_ATT_DLM_NAME\" at offset 0" }
+
+[[signature]]
+name = "xerox_dlm_firmware_version"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "25254f49445f4154545f444c4d5f56455253494f4e", endian = "little" } ]
+doc = { description = "Xerox Dlm Firmware Version; identifying magic \"%%OID_ATT_DLM_VERSION\" at offset 0" }
+
+[[signature]]
+name = "xerox_dlm_firmware_end_of_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "2525585258656e64", endian = "little" } ]
+doc = { description = "Xerox Dlm Firmware End Of Header; identifying magic \"%%XRXend\" at offset 0" }
+
+[[signature]]
+name = "sercomm_firmware_signature"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "734572436f4d6d", endian = "little" } ]
+doc = { description = "Sercomm Firmware Signature; identifying magic \"sErCoMm\" at offset 0" }
+
+[[signature]]
+name = "ubiquiti_firmware_header_header_size_264"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "55424e54", endian = "little" } ]
+doc = { description = "Ubiquiti Firmware Header Header Size 264; identifying magic \"UBNT\" at offset 0" }
+
+[[signature]]
+name = "ubiquiti_firmware_header_header_size_264"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "47454f53", endian = "little" } ]
+doc = { description = "Ubiquiti Firmware Header Header Size 264; identifying magic \"GEOS\" at offset 0" }
+
+[[signature]]
+name = "ubiquiti_firmware_header_third_party"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4f50454e", endian = "little" } ]
+doc = { description = "Ubiquiti Firmware Header Third Party; identifying magic \"OPEN\" at offset 0" }
+
+[[signature]]
+name = "ubiquiti_partition_header"
+category = "generic"
+magic_offset = 4
+short = true
+magic = [ { hex = "0000000050415254", endian = "little" } ]
+doc = { description = "Ubiquiti Partition Header; identifying magic 0x0000000050415254 at offset 4" }
+
+[[signature]]
+name = "ubiquiti_end_header_header_size_12_bytes"
+category = "generic"
+magic_offset = 4
+short = true
+magic = [ { hex = "00000000454e442e", endian = "little" } ]
+doc = { description = "Ubiquiti End Header Header Size 12 Bytes; identifying magic 0x00000000454e442e at offset 4" }
+
+[[signature]]
+name = "aih0n_firmware_header_header_size_48"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "414948304e", endian = "little" } ]
+doc = { description = "AIH0N Firmware Header Header Size 48; identifying magic \"AIH0N\" at offset 0" }
+
+[[signature]]
+name = "beyonwiz_firmware_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "57697a4677506b676c", endian = "little" } ]
+doc = { description = "Beyonwiz Firmware Header; identifying magic \"WizFwPkgl\" at offset 0" }
+
+[[signature]]
+name = "thompson_alcatel_encoded_firmware"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "424c49323233574a30", endian = "little" } ]
+doc = { description = "Thompson Alcatel Encoded Firmware; identifying magic \"BLI223WJ0\" at offset 0" }
+
+[[signature]]
+name = "uefi_pi_firmware_volume"
+category = "generic"
+magic_offset = 16
+short = true
+magic = [ { hex = "d954937a68044a4481ce0bf617d890df", endian = "little" } ]
+doc = { description = "UEFI Pi Firmware Volume; identifying magic 0xd954937a68044a4481ce0bf617d890df at offset 16" }
+
+[[signature]]
+name = "android_backup"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "414e44524f4944204241434b55500a", endian = "little" } ]
+doc = { description = "Android Backup; identifying magic 0x414e44524f4944204241434b55500a at offset 0" }
+
+[[signature]]
+name = "roku_aimage_sb"
+category = "generic"
+magic_offset = 8
+short = true
+magic = [ { hex = "696d6741524d6343", endian = "little" } ]
+doc = { description = "Roku Aimage SB; identifying magic \"imgARMcC\" at offset 8" }
+
+[[signature]]
+name = "ecos_rtos_string_reference"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "65636f73", endian = "little" } ]
+doc = { description = "eCos RTOS String Reference; identifying magic \"ecos\" at offset 0" }
+
+[[signature]]
+name = "ecos_rtos_string_reference"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "65436f73", endian = "little" } ]
+doc = { description = "eCos RTOS String Reference; identifying magic \"eCos\" at offset 0" }
+
+[[signature]]
+name = "ecos_rtos_string_reference"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "45434f53", endian = "little" } ]
+doc = { description = "eCos RTOS String Reference; identifying magic \"ECOS\" at offset 0" }
+
+[[signature]]
+name = "zyxel_rom_0_configuration_block_name_s"
+category = "generic"
+magic_offset = 6
+short = true
+magic = [ { hex = "64626761726561", endian = "little" } ]
+doc = { description = "ZyXEL Rom 0 Configuration Block Name S; identifying magic \"dbgarea\" at offset 6" }
+
+[[signature]]
+name = "zyxel_rom_0_configuration_block_name_s"
+category = "generic"
+magic_offset = 6
+short = true
+magic = [ { hex = "7370742e646174", endian = "little" } ]
+doc = { description = "ZyXEL Rom 0 Configuration Block Name S; identifying magic \"spt.dat\" at offset 6" }
+
+[[signature]]
+name = "zyxel_rom_0_configuration_block_name_s"
+category = "generic"
+magic_offset = 6
+short = true
+magic = [ { hex = "6175746f657865632e6e6574", endian = "little" } ]
+doc = { description = "ZyXEL Rom 0 Configuration Block Name S; identifying magic \"autoexec.net\" at offset 6" }
+
+[[signature]]
+name = "digi_international_firmware"
+category = "generic"
+magic_offset = 192
+short = true
+magic = [ { hex = "44696769", endian = "little" } ]
+doc = { description = "Digi International Firmware; identifying magic \"Digi\" at offset 192" }
+
+[[signature]]
+name = "lancom_firmware_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "454c5346", endian = "little" } ]
+doc = { description = "LANCOM Firmware Header; identifying magic \"ELSF\" at offset 0" }
+
+[[signature]]
+name = "lancom_oem_file"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "454c534f", endian = "little" } ]
+doc = { description = "LANCOM OEM File; identifying magic \"ELSO\" at offset 0" }
+
+[[signature]]
+name = "lancom_firmware_loader"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "454c5342", endian = "little" } ]
+doc = { description = "LANCOM Firmware Loader; identifying magic \"ELSB\" at offset 0" }
+
+[[signature]]
+name = "lancom_wwan_firmware"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "454c5343", endian = "little" } ]
+doc = { description = "LANCOM WWAN Firmware; identifying magic \"ELSC\" at offset 0" }
+
+[[signature]]
+name = "lancom_file_entry"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "454c5350", endian = "little" } ]
+doc = { description = "LANCOM File Entry; identifying magic \"ELSP\" at offset 0" }
+
+[[signature]]
+name = "qnap_encrypted_firmware_footer"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "6963706e6173", endian = "little" } ]
+doc = { description = "QNAP Encrypted Firmware Footer; identifying magic \"icpnas\" at offset 0" }
+
+[[signature]]
+name = "mediatek_serial_flash_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "53465f424f4f540000000000", endian = "little" } ]
+doc = { description = "MediaTek Serial Flash Image; identifying magic 0x53465f424f4f540000000000 at offset 0" }
+
+[[signature]]
+name = "mediatek_emmc_flash_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "454d4d435f424f4f54000000", endian = "little" } ]
+doc = { description = "MediaTek eMMC Flash Image; identifying magic 0x454d4d435f424f4f54000000 at offset 0" }
+
+[[signature]]
+name = "mediatek_nor_flash_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4e4f525f424f4f5400000000", endian = "little" } ]
+doc = { description = "MediaTek NOR Flash Image; identifying magic 0x4e4f525f424f4f5400000000 at offset 0" }
+
+[[signature]]
+name = "mediatek_boot_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "42524c5954000000", endian = "little" } ]
+doc = { description = "MediaTek Boot Header; identifying magic 0x42524c5954000000 at offset 0" }
+
+[[signature]]
+name = "boot_section_overlap"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "42424242", endian = "little" } ]
+doc = { description = "Boot Section Overlap; identifying magic \"BBBB\" at offset 0" }
+
+[[signature]]
+name = "mediatek_file_info"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "46494c455f494e464f000000", endian = "little" } ]
+doc = { description = "MediaTek File Info; identifying magic 0x46494c455f494e464f000000 at offset 0" }
+
+[[signature]]
+name = "android_bootimg"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "414e44524f494421", endian = "little" } ]
+doc = { description = "Android Bootimg; identifying magic \"ANDROID!\" at offset 0" }
+
+[[signature]]
+name = "frontier_silicon_ir2_x_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "761100007c00000001000000", endian = "little" } ]
+doc = { description = "Frontier Silicon Ir2 X Image; identifying magic 0x761100007c00000001000000 at offset 0" }
+
+[[signature]]
+name = "seagate_lod"
+category = "generic"
+magic_offset = 14
+short = true
+magic = [ { hex = "0700800100", endian = "little" } ]
+doc = { description = "Seagate Lod; identifying magic 0x0700800100 at offset 14" }
+
+[[signature]]
+name = "western_digital_royl"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "524f594c", endian = "little" } ]
+doc = { description = "Western Digital ROYL; identifying magic \"ROYL\" at offset 0" }
+
+[[signature]]
+name = "toshiba_cd2"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "d5bf981201", endian = "little" } ]
+doc = { description = "Toshiba CD2; identifying magic 0xd5bf981201 at offset 0" }
+
+[[signature]]
+name = "d_link_had"
+category = "generic"
+magic_offset = 96
+short = true
+magic = [ { hex = "464c4153485f3032", endian = "little" } ]
+doc = { description = "D Link HAD; identifying magic \"FLASH_02\" at offset 96" }
+
+[[signature]]
+name = "d_link_shrs"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "53485253", endian = "little" } ]
+doc = { description = "D Link SHRS; identifying magic \"SHRS\" at offset 0" }
+
+[[signature]]
+name = "d_link_mh01_encrypted_firmware_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4d483031", endian = "little" } ]
+doc = { description = "D Link MH01 Encrypted Firmware Image; identifying magic \"MH01\" at offset 0" }
+
+[[signature]]
+name = "d_link_encrypted_firmware_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "656e6372707465645f696d67", endian = "little" } ]
+doc = { description = "D Link Encrypted Firmware Image; identifying magic \"encrpted_img\" at offset 0" }
+
+[[signature]]
+name = "bosch_firmware"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "10122003", endian = "little" } ]
+doc = { description = "Bosch Firmware; identifying magic 0x10122003 at offset 0" }
+
+[[signature]]
+name = "draytek_vigor_167_firmware_container"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "32524448", endian = "little" } ]
+doc = { description = "Draytek Vigor 167 Firmware Container; identifying magic \"2RDH\" at offset 0" }
+
+[[signature]]
+name = "draytek_rtos_firmware_container"
+category = "generic"
+magic_offset = 9
+short = true
+magic = [ { hex = "446b6d666161727954656465637a", endian = "little" } ]
+doc = { description = "Draytek RTOS Firmware Container; identifying magic \"DkmfaaryTedecz\" at offset 9" }
+
+[[signature]]
+name = "instar_bneg_firmware_container"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "424e4547", endian = "little" } ]
+doc = { description = "Instar BNEG Firmware Container; identifying magic \"BNEG\" at offset 0" }
+
+[[signature]]
+name = "alphanetworks_camera_firmware_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "23212f62696e2f73680a56454e444f52", endian = "little" } ]
+doc = { description = "Alphanetworks Camera Firmware Image; identifying magic 0x23212f62696e2f73680a56454e444f52 at offset 0" }
+
+[[signature]]
+name = "xiaomi_hdr1_firmware_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "48445231", endian = "little" } ]
+doc = { description = "Xiaomi HDR1 Firmware Image; identifying magic \"HDR1\" at offset 0" }
+
+[[signature]]
+name = "xiaomi_hdr2_firmware_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "48445232", endian = "little" } ]
+doc = { description = "Xiaomi HDR2 Firmware Image; identifying magic \"HDR2\" at offset 0" }
+
+[[signature]]
+name = "broadcom_sao_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "534f424a", endian = "little" } ]
+doc = { description = "Broadcom SAO Image; identifying magic \"SOBJ\" at offset 0" }
+
+[[signature]]
+name = "broadcom_sao_encryption_header"
+category = "generic"
+magic_offset = 4
+short = true
+magic = [ { hex = "454e434b", endian = "little" } ]
+doc = { description = "Broadcom SAO Encryption Header; identifying magic \"ENCK\" at offset 4" }
+
+[[signature]]
+name = "senao_firmware_container"
+category = "generic"
+magic_offset = 102
+short = true
+magic = [ { hex = "223330343722", endian = "little" } ]
+doc = { description = "Senao Firmware Container; identifying magic \"\"3047\"\" at offset 102" }
+
+[[signature]]
+name = "senao_firmware_container"
+category = "generic"
+magic_offset = 46
+short = true
+magic = [ { hex = "223330343722", endian = "little" } ]
+doc = { description = "Senao Firmware Container; identifying magic \"\"3047\"\" at offset 46" }
+
+[[signature]]
+name = "gm8126_spi_flash_image_header"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "805a474d", endian = "little" } ]
+doc = { description = "GM8126 SPI Flash Image Header; identifying magic 0x805a474d at offset 0" }
+
+[[signature]]
+name = "d_link_deafbead_container"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "deafbead", endian = "little" } ]
+doc = { description = "D Link Deafbead Container; identifying magic 0xdeafbead at offset 0" }
+
+[[signature]]
+name = "u_boot_version_string"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "552d426f6f7420", endian = "little" } ]
+doc = { description = "U Boot Version String; identifying magic \"U-Boot \" at offset 0" }
+
+[[signature]]
+name = "cfe_boot_loader"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "43464531", endian = "little" } ]
+doc = { description = "CFE Boot Loader; identifying magic \"CFE1\" at offset 0" }
+
+[[signature]]
+name = "squashfs_filesystem_big_endian"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "73717368", endian = "little" } ]
+doc = { description = "SquashFS Filesystem Big Endian; identifying magic \"sqsh\" at offset 0" }
+
+[[signature]]
+name = "squashfs_filesystem_little_endian"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "68737173", endian = "little" } ]
+doc = { description = "SquashFS Filesystem Little Endian; identifying magic \"hsqs\" at offset 0" }
+
+[[signature]]
+name = "squashfs_filesystem_non_standard_big_end"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "73716c7a", endian = "little" } ]
+doc = { description = "SquashFS Filesystem Non Standard Big End; identifying magic \"sqlz\" at offset 0" }
+
+[[signature]]
+name = "squashfs_filesystem_non_standard_little"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "7a6c7173", endian = "little" } ]
+doc = { description = "SquashFS Filesystem Non Standard Little; identifying magic \"zlqs\" at offset 0" }
+
+[[signature]]
+name = "squashfs_filesystem_ddwrt_big_endian"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "74717368", endian = "little" } ]
+doc = { description = "SquashFS Filesystem Ddwrt Big Endian; identifying magic \"tqsh\" at offset 0" }
+
+[[signature]]
+name = "squashfs_filesystem_ddwrt_little_endian"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "68737174", endian = "little" } ]
+doc = { description = "SquashFS Filesystem Ddwrt Little Endian; identifying magic \"hsqt\" at offset 0" }
+
+[[signature]]
+name = "squashfs_filesystem_broadcom_big_endian"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "71736873", endian = "little" } ]
+doc = { description = "SquashFS Filesystem Broadcom Big Endian; identifying magic \"qshs\" at offset 0" }
+
+[[signature]]
+name = "squashfs_filesystem_broadcom_little_endi"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "73687371", endian = "little" } ]
+doc = { description = "SquashFS Filesystem Broadcom Little Endi; identifying magic \"shsq\" at offset 0" }
+
+[[signature]]
+name = "avm_squashfs_fake"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "73717368000000000000", endian = "little" } ]
+doc = { description = "AVM SquashFS Fake; identifying magic 0x73717368000000000000 at offset 0" }
+
+[[signature]]
+name = "romfs_filesystem_version_1"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "2d726f6d3166732d", endian = "little" } ]
+doc = { description = "romfs Filesystem Version 1; identifying magic \"-rom1fs-\" at offset 0" }
+
+[[signature]]
+name = "ntfs_filesystem"
+category = "generic"
+magic_offset = 3
+short = true
+magic = [ { hex = "4e544653", endian = "little" } ]
+doc = { description = "NTFS Filesystem; identifying magic \"NTFS\" at offset 3" }
+
+[[signature]]
+name = "asus_uefi_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "8ba63c4a2377fb4880", endian = "little" } ]
+doc = { description = "ASUS UEFI Image; identifying magic 0x8ba63c4a2377fb4880 at offset 0" }
+
+[[signature]]
+name = "dell_hdr_pfs_uefi_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "5046532e484452", endian = "little" } ]
+doc = { description = "Dell Hdr PFS UEFI Image; identifying magic \"PFS.HDR\" at offset 0" }
+
+[[signature]]
+name = "dell_hdr_tag_uefi_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "24544147010000005dc28e14", endian = "little" } ]
+doc = { description = "Dell Hdr TAG UEFI Image; identifying magic 0x24544147010000005dc28e14 at offset 0" }
+
+[[signature]]
+name = "dell_k_uefi_image"
+category = "generic"
+magic_offset = 2
+short = true
+magic = [ { hex = "6b170000000000000000000000000000000078e58c8c3d8a1c", endian = "little" } ]
+doc = { description = "Dell K UEFI Image; identifying magic 0x6b170000000000000000000000000000000078e58c8c3d8a1c at offset 2" }
+
+[[signature]]
+name = "hp_laserjet_1000_series_downloadable_fir"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "beef4142434445464748", endian = "little" } ]
+doc = { description = "HP LaserJet 1000 Series Downloadable Fir; identifying magic 0xbeef4142434445464748 at offset 0" }
+
+[[signature]]
+name = "hp_printer_job_language_data"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "1b252d31323334355840504a4c", endian = "little" } ]
+doc = { description = "HP Printer Job Language Data; identifying magic 0x1b252d31323334355840504a4c at offset 0" }
+
+[[signature]]
+name = "hp_update_stream_1"
+category = "generic"
+magic_offset = 3
+short = true
+magic = [ { hex = "000011000000000000beac", endian = "little" } ]
+doc = { description = "HP Update Stream 1; identifying magic 0x000011000000000000beac at offset 3" }
+
+[[signature]]
+name = "dsk1_0_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "1b44534b312e30", endian = "little" } ]
+doc = { description = "DSK1 0 Image; identifying magic 0x1b44534b312e30 at offset 0" }
+
+[[signature]]
+name = "extended_dsk1_0_image"
+category = "generic"
+magic_offset = 12
+short = true
+magic = [ { hex = "1b44534b312e30", endian = "little" } ]
+doc = { description = "Extended DSK1 0 Image; identifying magic 0x1b44534b312e30 at offset 12" }
+
+[[signature]]
+name = "postscript"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "25215053", endian = "little" } ]
+doc = { description = "PostScript; identifying magic \"%!PS\" at offset 0" }
+
+[[signature]]
+name = "dji_drone_image"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "78563412", endian = "little" } ]
+doc = { description = "DJI Drone Image; identifying magic 0x78563412 at offset 0" }
+
+[[signature]]
+name = "ambarella_image"
+category = "generic"
+magic_offset = 164
+short = true
+magic = [ { hex = "90eb24a30000", endian = "little" } ]
+doc = { description = "Ambarella Image; identifying magic 0x90eb24a30000 at offset 164" }
+
+[[signature]]
+name = "ambarella_romfs"
+category = "generic"
+magic_offset = 4
+short = true
+magic = [ { hex = "8a32fc66", endian = "little" } ]
+doc = { description = "Ambarella romfs; identifying magic 0x8a32fc66 at offset 4" }
+
+[[signature]]
+name = "linux_8086_executable"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "01032004", endian = "little" } ]
+doc = { description = "Linux 8086 Executable; identifying magic 0x01032004 at offset 0" }
+
+[[signature]]
+name = "linux_8086_object_file"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "a3860100", endian = "little" } ]
+doc = { description = "Linux 8086 Object File; identifying magic 0xa3860100 at offset 0" }
+
+[[signature]]
+name = "minix_386_executable"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "01032010", endian = "little" } ]
+doc = { description = "Minix 386 Executable; identifying magic 0x01032010 at offset 0" }
+
+[[signature]]
+name = "linux_i386_lilo_boot_chain_loader"
+category = "generic"
+magic_offset = 2
+short = true
+magic = [ { hex = "4c494c4f", endian = "little" } ]
+doc = { description = "Linux I386 LILO Boot Chain Loader; identifying magic \"LILO\" at offset 2" }
+
+[[signature]]
+name = "linux_make_config_build_file_old"
+category = "generic"
+magic_offset = 28
+short = true
+magic = [ { hex = "6d616b6520636f6e666967", endian = "little" } ]
+doc = { description = "Linux Make Config Build File Old; identifying magic \"make config\" at offset 28" }
+
+[[signature]]
+name = "linux_i386_pc_screen_font_v2_data"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "72b54a860000", endian = "little" } ]
+doc = { description = "Linux I386 Pc Screen Font V2 Data; identifying magic 0x72b54a860000 at offset 0" }
+
+[[signature]]
+name = "linux_i386_swap_file"
+category = "generic"
+magic_offset = 4086
+short = true
+magic = [ { hex = "535741502d5350414345", endian = "little" } ]
+doc = { description = "Linux I386 Swap File; identifying magic \"SWAP-SPACE\" at offset 4086" }
+
+[[signature]]
+name = "linux_i386_swap_file_new_style_with_swsu"
+category = "generic"
+magic_offset = 4076
+short = true
+magic = [ { hex = "53574150535041434532533153555350454e44", endian = "little" } ]
+doc = { description = "Linux I386 Swap File New Style With Swsu; identifying magic \"SWAPSPACE2S1SUSPEND\" at offset 4076" }
+
+[[signature]]
+name = "linux_i386_swap_file_new_style_compresse"
+category = "generic"
+magic_offset = 4076
+short = true
+magic = [ { hex = "535741505350414345324c494e48494230303031", endian = "little" } ]
+doc = { description = "Linux I386 Swap File New Style Compresse; identifying magic \"SWAPSPACE2LINHIB0001\" at offset 4076" }
+
+[[signature]]
+name = "linux_i386_swap_file_new_style"
+category = "generic"
+magic_offset = 4086
+short = true
+magic = [ { hex = "53574150535041434532", endian = "little" } ]
+doc = { description = "Linux I386 Swap File New Style; identifying magic \"SWAPSPACE2\" at offset 4086" }
+
+[[signature]]
+name = "linux_kernel"
+category = "generic"
+magic_offset = 514
+short = true
+magic = [ { hex = "48647253", endian = "little" } ]
+doc = { description = "Linux Kernel; identifying magic \"HdrS\" at offset 514" }
+
+[[signature]]
+name = "linux"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "b8c0078ed8b80090", endian = "little" } ]
+doc = { description = "Linux; identifying magic 0xb8c0078ed8b80090 at offset 0" }
+
+[[signature]]
+name = "linux_s390"
+category = "generic"
+magic_offset = 8
+short = true
+magic = [ { hex = "020000186000005002000068600000504040404040404040", endian = "little" } ]
+doc = { description = "Linux S390; identifying magic 0x020000186000005002000068600000504040404040404040 at offset 8" }
+
+[[signature]]
+name = "user_mode_linux_s_copy_on_write_disk_ima"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4f4f4f4d", endian = "little" } ]
+doc = { description = "User Mode Linux S Copy On Write Disk Ima; identifying magic \"OOOM\" at offset 0" }
+
+[[signature]]
+name = "lvm2_pv_linux_logical_volume_manager"
+category = "generic"
+magic_offset = 536
+short = true
+magic = [ { hex = "4c564d3220303031", endian = "little" } ]
+doc = { description = "LVM2 PV Linux Logical Volume Manager; identifying magic \"LVM2 001\" at offset 536" }
+
+[[signature]]
+name = "lvm2_pv_linux_logical_volume_manager"
+category = "generic"
+magic_offset = 24
+short = true
+magic = [ { hex = "4c564d3220303031", endian = "little" } ]
+doc = { description = "LVM2 PV Linux Logical Volume Manager; identifying magic \"LVM2 001\" at offset 24" }
+
+[[signature]]
+name = "lvm2_pv_linux_logical_volume_manager"
+category = "generic"
+magic_offset = 1048
+short = true
+magic = [ { hex = "4c564d3220303031", endian = "little" } ]
+doc = { description = "LVM2 PV Linux Logical Volume Manager; identifying magic \"LVM2 001\" at offset 1048" }
+
+[[signature]]
+name = "lvm2_pv_linux_logical_volume_manager"
+category = "generic"
+magic_offset = 1560
+short = true
+magic = [ { hex = "4c564d3220303031", endian = "little" } ]
+doc = { description = "LVM2 PV Linux Logical Volume Manager; identifying magic \"LVM2 001\" at offset 1560" }
+
+[[signature]]
+name = "lvm_snapshot_copyonwrite_store"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "536e4170", endian = "little" } ]
+doc = { description = "LVM Snapshot Copyonwrite Store; identifying magic \"SnAp\" at offset 0" }
+
+[[signature]]
+name = "luks_encrypted_file"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4c554b53babe", endian = "little" } ]
+doc = { description = "LUKS Encrypted File; identifying magic 0x4c554b53babe at offset 0" }
+
+[[signature]]
+name = "xen_saved_domain"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4c696e757847756573745265636f7264", endian = "little" } ]
+doc = { description = "Xen Saved Domain; identifying magic \"LinuxGuestRecord\" at offset 0" }
+
+[[signature]]
+name = "journal_file"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4c504b5348485248", endian = "little" } ]
+doc = { description = "Journal File; identifying magic \"LPKSHHRH\" at offset 0" }
+
+[[signature]]
+name = "mlocate_database"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "006d6c6f63617465", endian = "little" } ]
+doc = { description = "mlocate Database; identifying magic 0x006d6c6f63617465 at offset 0" }
+
+[[signature]]
+name = "kdump_compressed_dump"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "4b44554d50", endian = "little" } ]
+doc = { description = "Kdump Compressed Dump; identifying magic \"KDUMP\" at offset 0" }
+
+[[signature]]
+name = "avm_kernel_image_v1"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "8112edfe", endian = "little" } ]
+doc = { description = "AVM Kernel Image V1; identifying magic 0x8112edfe at offset 0" }
+
+[[signature]]
+name = "avm_kernel_image_v2"
+category = "generic"
+magic_offset = 0
+short = true
+magic = [ { hex = "1291edfe", endian = "little" } ]
+doc = { description = "AVM Kernel Image V2; identifying magic 0x1291edfe at offset 0" }
+

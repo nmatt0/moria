@@ -1,0 +1,11 @@
+name = "7z"
+category = "archive"
+confidence = "structural"
+
+[[magic]]
+hex = "377abcaf271c"
+endian = "little"
+
+[doc]
+description = "7-Zip archive."
+references = [ { title = "7z format", url = "https://py7zr.readthedocs.io/en/latest/archive_format.html" } ]

@@ -1,0 +1,18 @@
+name = "yaffs2"
+category = "filesystem"
+
+# YAFFS2 has no format magic. Anchor on the deprecated 0xFFFF "sum" field at
+# offset 8 of the first object header; the validator confirms the header shape.
+magic_offset = 8
+short = true
+validator = "yaffs2"
+
+[[magic]]
+hex = "ffff"
+endian = "little"
+
+[doc]
+description = "YAFFS2 flash filesystem (heuristic: first-object header). Little-endian only; no format magic."
+references = [
+  { title = "YAFFS2 spec", url = "https://yaffs.net/documents/how-yaffs-works" },
+]

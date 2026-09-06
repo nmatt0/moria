@@ -1,0 +1,14 @@
+name = "png"
+category = "image"
+
+# 8-byte PNG signature immediately followed by the IHDR chunk (length 13 + tag),
+# folded into one 16-byte magic -> effectively self-validating.
+confidence = "consistent"
+
+[[magic]]
+hex = "89504e470d0a1a0a0000000d49484452"
+endian = "big"
+
+[doc]
+description = "PNG image."
+references = [ { title = "PNG spec", url = "https://www.w3.org/TR/png/" } ]

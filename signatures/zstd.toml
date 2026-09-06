@@ -1,0 +1,25 @@
+name = "zstd"
+category = "compression"
+
+struct = """
+  skip[4];
+  u8 fhd;
+"""
+
+# Frame header descriptor reserved bit (bit 3) must be zero.
+constraints = [
+  "(fhd & 8) == 0",
+]
+
+confidence = "structural"
+
+# Zstandard frame: 4-byte magic then the frame header descriptor.
+[[magic]]
+hex = "28b52ffd"
+endian = "little"
+
+[doc]
+description = "Zstandard-compressed data."
+references = [
+  { title = "RFC 8878 (Zstandard)", url = "https://www.rfc-editor.org/rfc/rfc8878" },
+]

@@ -1,0 +1,20 @@
+name = "openssl_salted"
+category = "encrypted"
+
+confidence = "structural"
+
+# The `deobf` validator tries the known firmware passwords (EVP_BytesToKey ->
+# AES-256-CBC) and upgrades to verified when one decrypts to a firmware magic.
+validator = "deobf"
+
+# "Salted__" — OpenSSL `enc` format (8-byte magic, 8-byte salt, then ciphertext).
+# Used by several D-Link firmware families (dap1610, r95/m95/r36/m36).
+[[magic]]
+ascii = "Salted__"
+endian = "big"
+
+[doc]
+description = "OpenSSL-encrypted firmware (Salted__; decryptable with known vendor passwords)."
+references = [
+  { title = "delink (D-Link firmware decryption)", url = "https://github.com/devttys0/delink" },
+]

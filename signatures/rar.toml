@@ -1,0 +1,14 @@
+name = "rar"
+category = "archive"
+confidence = "structural"
+
+[[magic]]
+hex = "526172211a0700"
+endian = "little"
+[[magic]]
+hex = "526172211a070100"
+endian = "little"
+
+[doc]
+description = "RAR archive (v4 or v5)."
+references = [ { title = "RAR format", url = "https://www.rarlab.com/technote.htm" } ]

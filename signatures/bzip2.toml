@@ -1,0 +1,18 @@
+name = "bzip2"
+category = "compression"
+
+struct = """
+  skip[3];
+  u8 level;
+"""
+# "BZh" then a block-size digit 1-9.
+constraints = [ "level in 0x31..0x39" ]
+confidence = "structural"
+
+[[magic]]
+ascii = "BZh"
+endian = "little"
+
+[doc]
+description = "bzip2-compressed data."
+references = [ { title = "bzip2", url = "https://sourceware.org/bzip2/" } ]

@@ -1,0 +1,16 @@
+name = "lk"
+category = "bootloader"
+
+# Qualcomm "Little Kernel" (LK/aboot) image: the ASCII tag "LK\0\0" sits at
+# offset 8, after a device-specific header word. Heuristic, so magic tier.
+magic_offset = 8
+
+[[magic]]
+hex = "4c4b0000"
+endian = "little"
+
+[doc]
+description = "Little Kernel (LK/aboot) bootloader image."
+references = [
+  { title = "LK bootloader", url = "https://github.com/littlekernel/lk" },
+]

@@ -1,0 +1,33 @@
+name = "exfat"
+category = "filesystem"
+
+# exFAT boot sector: the "EXFAT   " file-system name string sits at offset 3.
+magic_offset = 3
+
+struct = """
+  skip[3];
+  bytes[8] fs_name;
+  skip[69];
+  u32 fat_offset;
+  u32 fat_length;
+  u32 cluster_heap_offset;
+  u32 cluster_count;
+"""
+
+constraints = [
+  "fat_offset > 0",
+  "cluster_heap_offset > 0",
+  "cluster_count > 0",
+]
+
+confidence = "consistent"
+
+[[magic]]
+hex = "4558464154202020"
+endian = "little"
+
+[doc]
+description = "exFAT filesystem (SD cards, removable media)."
+references = [
+  { title = "exFAT specification", url = "https://learn.microsoft.com/windows/win32/fileio/exfat-specification" },
+]

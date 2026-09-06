@@ -1,0 +1,30 @@
+name = "elf"
+category = "executable"
+
+# Only e_ident (endian-agnostic bytes) is parsed declaratively; e_type and
+# e_machine are read by the validator using the endianness from EI_DATA.
+struct = """
+  skip[4];
+  u8 ei_class;
+  u8 ei_data;
+  u8 ei_version;
+"""
+
+constraints = [
+  "ei_class in 1..2",   # 1 = 32-bit, 2 = 64-bit
+  "ei_data in 1..2",    # 1 = little, 2 = big
+  "ei_version == 1",
+]
+
+validator = "elf"       # decodes class/endian/type/arch, bumps to `consistent`
+
+# \x7f E L F
+[[magic]]
+hex = "7f454c46"
+endian = "little"
+
+[doc]
+description = "ELF executable/shared object/relocatable object."
+references = [
+  { title = "ELF specification (System V ABI)", url = "https://refspecs.linuxfoundation.org/elf/elf.pdf" },
+]

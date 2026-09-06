@@ -1,0 +1,41 @@
+name = "xfs"
+category = "filesystem"
+
+# XFS superblock at offset 0; magic 'XFSB' is the first field. Big-endian.
+struct = """
+  skip[4];
+  u32 blocksize;
+  u64 dblocks;
+  skip[40];
+  u64 rootino;
+  skip[20];
+  u32 agblocks;
+  u32 agcount;
+  skip[8];
+  u16 versionnum;
+  skip[2];
+  u16 inodesize;
+"""
+
+constraints = [
+  "blocksize in 512..65536",
+  "(blocksize & (blocksize - 1)) == 0",
+  "agblocks > 0",
+  "agcount > 0",
+  "inodesize in 256..65536",
+  "rootino > 0",
+]
+
+size = "dblocks * blocksize"
+size_clamp = true
+confidence = "consistent"
+
+[[magic]]
+hex = "58465342"
+endian = "big"
+
+[doc]
+description = "XFS filesystem (SGI/Linux extent-based, common on RHEL and NAS/appliance images)."
+references = [
+  { title = "XFS Algorithms & Data Structures", url = "https://mirror.math.princeton.edu/pub/kernel/linux/utils/fs/xfs/docs/xfs_filesystem_structure.pdf" },
+]

@@ -1,0 +1,20 @@
+name = "dlink_encrpted_img"
+category = "encrypted"
+
+confidence = "structural"
+
+# The `deobf` validator confirms the fixed AES-256 key by decrypting the first
+# block to the expected UBI magic, and sizes the finding to the ciphertext span.
+validator = "deobf"
+
+# "encrpted_img" — D-Link DIR-X series AES-256-CBC firmware (fixed key + IV,
+# 128 KiB blocks, plaintext is a UBI image).
+[[magic]]
+ascii = "encrpted_img"
+endian = "big"
+
+[doc]
+description = "D-Link encrpted_img AES-256-CBC encrypted firmware (offline-decryptable)."
+references = [
+  { title = "delink (D-Link firmware decryption)", url = "https://github.com/devttys0/delink" },
+]

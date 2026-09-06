@@ -1,0 +1,27 @@
+name = "romfs"
+category = "filesystem"
+
+struct = """
+  bytes[8] magic;
+  u32 full_size;
+  u32 checksum;
+"""
+
+constraints = [
+  "full_size > 0",
+  "full_size <= _avail",
+]
+
+size = "full_size"
+confidence = "consistent"
+
+# romfs is big-endian.
+[[magic]]
+ascii = "-rom1fs-"
+endian = "big"
+
+[doc]
+description = "romfs (small read-only filesystem)."
+references = [
+  { title = "romfs format", url = "https://www.kernel.org/doc/html/latest/filesystems/romfs.html" },
+]

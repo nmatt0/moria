@@ -1,0 +1,52 @@
+name = "squashfs_legacy"
+category = "filesystem"
+
+# SquashFS v1-v3: same magics as v4 but an older superblock (bytes_used is a
+# u32 at offset 8). Constraint s_major in 1..3 makes it mutually exclusive with
+# the v4 definition, which shares these magics.
+struct = """
+  bytes[4] s_magic;
+  u32 inodes;
+  u32 bytes_used;
+  skip[16];
+  u16 s_major;
+  u16 s_minor;
+"""
+
+constraints = [
+  "s_major in 1..3",
+  "inodes > 0",
+  "bytes_used > 0",
+  "bytes_used <= _avail",
+]
+
+size = "bytes_used"
+confidence = "structural"
+
+[[magic]]
+ascii = "hsqs"
+endian = "little"
+[[magic]]
+ascii = "sqsh"
+endian = "big"
+[[magic]]
+ascii = "sqlz"
+endian = "big"
+[[magic]]
+ascii = "qshs"
+endian = "big"
+[[magic]]
+ascii = "tqsh"
+endian = "big"
+[[magic]]
+ascii = "hsqt"
+endian = "little"
+[[magic]]
+ascii = "shsq"
+endian = "little"
+
+[doc]
+description = "SquashFS v1-v3 compressed read-only filesystem (legacy embedded Linux)."
+references = [
+  { title = "SquashFS Binary Format", url = "https://dr-emann.github.io/squashfs/" },
+]

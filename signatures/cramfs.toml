@@ -1,0 +1,36 @@
+name = "cramfs"
+category = "filesystem"
+
+# Use the 16-byte signature string as the magic (strong); it sits at +16 of the
+# superblock. Both endian entries are listed so the size field parses correctly
+# regardless of the image's byte order (the wrong one fails the size check).
+magic_offset = 16
+
+struct = """
+  u32 magic;
+  u32 size;
+  u32 flags;
+  u32 future;
+  bytes[16] signature;
+"""
+
+constraints = [
+  "size > 0",
+  "size <= _avail",
+]
+
+size = "size"
+confidence = "consistent"
+
+[[magic]]
+ascii = "Compressed ROMFS"
+endian = "little"
+[[magic]]
+ascii = "Compressed ROMFS"
+endian = "big"
+
+[doc]
+description = "cramfs (compressed ROM filesystem)."
+references = [
+  { title = "cramfs format", url = "https://www.kernel.org/doc/html/latest/filesystems/cramfs.html" },
+]

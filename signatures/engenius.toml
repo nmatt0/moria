@@ -1,0 +1,18 @@
+name = "engenius"
+category = "encrypted"
+confidence = "structural"
+
+# The identifying pattern (magic[4]=0x12345678 + reg_dom "all") sits at header+0x5C.
+magic_offset = 92
+validator = "deobf"
+
+# EnGenius keyless repeating-XOR firmware (EAP/ENH/ECB access points).
+[[magic]]
+hex = "12345678616c6c"
+endian = "big"
+
+[doc]
+description = "EnGenius XOR-obfuscated firmware (keyless; decryptable)."
+references = [
+  { title = "unblob Engenius handler", url = "https://github.com/onekey-sec/unblob" },
+]

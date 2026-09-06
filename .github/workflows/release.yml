@@ -1,0 +1,49 @@
+name: release
+
+# Build a prebuilt binary on every version tag (e.g. `git tag v1.0.0 && git push
+# --tags`) and attach it to the GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write        # needed to create/update the Release
+
+jobs:
+  linux-x86_64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ python3 \
+            zlib1g-dev liblzma-dev liblz4-dev libzstd-dev
+
+      - name: Configure and build (Release)
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j
+
+      - name: Test gate
+        run: |
+          ./build/moria_unit
+          python3 tests/test_samples.py
+
+      - name: Package
+        run: |
+          pkg="moria-${GITHUB_REF_NAME}-linux-x86_64"
+          # The binary embeds its signature sets, so the release is just the
+          # self-contained binary plus the man page and license/readme.
+          mkdir -p "dist/${pkg}"
+          cp build/moria moria.1 LICENSE README.md THIRD_PARTY.md "dist/${pkg}/"
+          tar -C dist -czf "${pkg}.tar.gz" "${pkg}"
+          sha256sum "${pkg}.tar.gz" > "${pkg}.tar.gz.sha256"
+
+      - name: Attach to the Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            moria-*-linux-x86_64.tar.gz
+            moria-*-linux-x86_64.tar.gz.sha256

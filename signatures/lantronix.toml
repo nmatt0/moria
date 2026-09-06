@@ -1,0 +1,32 @@
+name = "lantronix_firmware"
+category = "firmware"
+
+# Lantronix device-server firmware container. The newer ROM/`.rom` images start
+# with an ASCII family tag "NUEVO-<n>" or "MIDAS-<n>" followed by a NUL, where
+# <n> is a single ASCII digit (format generation). Proprietary; identify only
+# (no public unpack), so this surfaces "Lantronix firmware" instead of a blank.
+# Ref: observed across EDS3000/EDS-MD/PremierWave/xPort-Edge/xPort-Pro images.
+struct = """
+  skip[6];
+  u8 gen;
+  u8 nul;
+"""
+constraints = [
+  "gen >= 0x30",
+  "gen <= 0x39",
+  "nul == 0",
+]
+confidence = "structural"
+
+[[magic]]
+ascii = "NUEVO-"
+endian = "little"
+[[magic]]
+ascii = "MIDAS-"
+endian = "little"
+
+[doc]
+description = "Lantronix device-server firmware container (NUEVO-/MIDAS- header)."
+references = [
+  { title = "Lantronix firmware (device servers: xPort, EDS, PremierWave)", url = "https://www.lantronix.com/" },
+]

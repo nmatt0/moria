@@ -1,0 +1,12 @@
+name = "dlink_tlv"
+category = "encrypted"
+confidence = "structural"
+validator = "deobf"
+# 0x64801940 — D-Link TLV AES-256 firmware; key = HMAC-SHA1(board_id, model_name).
+# Provisional; verified against a real image later.
+[[magic]]
+hex = "64801940"
+endian = "big"
+[doc]
+description = "D-Link TLV AES-256-CBC encrypted firmware (HMAC-SHA1-derived key)."
+references = [ { title = "delink", url = "https://github.com/devttys0/delink" } ]

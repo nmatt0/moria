@@ -1,0 +1,26 @@
+name = "lz4"
+category = "compression"
+
+struct = """
+  skip[4];
+  u8 flg;
+"""
+
+# FLG version bits (7-6) == 01; reserved bit 1 == 0.
+constraints = [
+  "(flg >> 6) == 1",
+  "(flg & 2) == 0",
+]
+
+confidence = "structural"
+
+# LZ4 frame format: 4-byte magic then the FLG descriptor byte.
+[[magic]]
+hex = "04224d18"
+endian = "little"
+
+[doc]
+description = "LZ4 frame-format compressed data."
+references = [
+  { title = "LZ4 Frame Format", url = "https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md" },
+]

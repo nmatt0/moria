@@ -1,0 +1,12 @@
+name = "dlink_mh01"
+category = "encrypted"
+confidence = "structural"
+validator = "deobf"
+# "MH01" — D-Link AES-128 firmware (device passphrase table, IV in header,
+# OpenSSL Salted__ payload). Provisional; verified against a real image later.
+[[magic]]
+ascii = "MH01"
+endian = "big"
+[doc]
+description = "D-Link MH01 AES-128-CBC encrypted firmware (device key table)."
+references = [ { title = "delink", url = "https://github.com/devttys0/delink" } ]

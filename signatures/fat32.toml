@@ -1,0 +1,34 @@
+name = "fat32"
+category = "filesystem"
+
+# FAT32 boot sector: the FS-type string "FAT32   " sits at offset 82. The BPB
+# gives bytes-per-sector (@11) and the 32-bit sector count (@32).
+magic_offset = 82
+
+struct = """
+  skip[11];
+  u16 bytes_per_sec;
+  skip[19];
+  u32 total_sec32;
+  skip[46];
+  bytes[5] fstype;
+"""
+
+constraints = [
+  "bytes_per_sec in 512..4096",
+  "total_sec32 > 0",
+]
+
+size = "total_sec32 * bytes_per_sec"
+size_clamp = true
+confidence = "consistent"
+
+[[magic]]
+hex = "4641543332"
+endian = "little"
+
+[doc]
+description = "FAT32 filesystem (DOS/EFI/SD-card boot or data partition)."
+references = [
+  { title = "FAT specification", url = "https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system" },
+]

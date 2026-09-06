@@ -1,0 +1,31 @@
+name = "iso9660"
+category = "filesystem"
+
+# ISO 9660: a volume descriptor set begins at sector 16 (offset 32768). The
+# Primary Volume Descriptor there starts with type byte 1 followed by the
+# standard identifier "CD001". The magic string sits at offset 32769.
+magic_offset = 32769
+
+struct = """
+  skip[32768];
+  u8 vd_type;
+  bytes[5] std_id;
+  u8 vd_version;
+"""
+
+constraints = [
+  "vd_type == 1",
+  "vd_version == 1",
+]
+
+confidence = "consistent"
+
+[[magic]]
+hex = "4344303031"
+endian = "little"
+
+[doc]
+description = "ISO 9660 filesystem (optical / firmware update or recovery image)."
+references = [
+  { title = "ISO 9660", url = "https://wiki.osdev.org/ISO_9660" },
+]

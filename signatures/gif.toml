@@ -1,0 +1,14 @@
+name = "gif"
+category = "image"
+confidence = "structural"
+
+[[magic]]
+ascii = "GIF87a"
+endian = "little"
+[[magic]]
+ascii = "GIF89a"
+endian = "little"
+
+[doc]
+description = "GIF image."
+references = [ { title = "GIF89a spec", url = "https://www.w3.org/Graphics/GIF/spec-gif89a.txt" } ]

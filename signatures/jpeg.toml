@@ -1,0 +1,22 @@
+name = "jpeg"
+category = "image"
+
+struct = """
+  skip[3];
+  u8 marker;
+"""
+# 4th byte is the marker after SOI. It must introduce a real segment: 0xC0-0xFE
+# but NOT 0xD0-0xD9 (RST0-7/SOI/EOI are standalone/invalid here). This rejects the
+# common `ff d8 ff d8 ...` false positive (repeated SOI bytes in compressed data).
+constraints = [ "marker >= 0xc0", "marker <= 0xcf || marker >= 0xda" ]
+confidence = "structural"
+
+validator = "jpeg"
+
+[[magic]]
+hex = "ffd8ff"
+endian = "little"
+
+[doc]
+description = "JPEG image."
+references = [ { title = "JFIF/JPEG", url = "https://www.w3.org/Graphics/JPEG/" } ]

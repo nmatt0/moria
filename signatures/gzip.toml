@@ -1,0 +1,30 @@
+name = "gzip"
+category = "compression"
+
+struct = """
+  skip[3];
+  u8 flg;
+  u32 mtime;
+  u8 xfl;
+  u8 os;
+"""
+
+# FLG reserved bits (5-7) must be zero; OS is a known value or 0xFF (unknown).
+constraints = [
+  "flg < 0x20",
+  "os <= 13 || os == 255",
+]
+
+# Size is unknown without decoding the deflate stream.
+confidence = "structural"
+
+# gzip: 0x1f 0x8b, compression method 0x08 (deflate).
+[[magic]]
+hex = "1f8b08"
+endian = "little"
+
+[doc]
+description = "gzip-compressed data (DEFLATE)."
+references = [
+  { title = "RFC 1952 (gzip)", url = "https://www.rfc-editor.org/rfc/rfc1952" },
+]

@@ -1,0 +1,24 @@
+name = "cpio"
+category = "archive"
+
+# The validator verifies the ASCII-hex header and computes each entry's size,
+# so entries skip-ahead and coalesce into one archive region.
+validator = "cpio"
+coalesce = true
+
+# cpio ASCII headers.
+[[magic]]
+ascii = "070701"
+endian = "little"
+[[magic]]
+ascii = "070702"
+endian = "little"
+[[magic]]
+ascii = "070707"
+endian = "little"
+
+[doc]
+description = "cpio archive (newc/crc/odc), often the payload of an initramfs."
+references = [
+  { title = "cpio format (Linux initramfs)", url = "https://www.kernel.org/doc/html/latest/driver-api/early-userspace/buffer-format.html" },
+]

@@ -1,0 +1,31 @@
+name = "ubifs"
+category = "filesystem"
+
+# UBIFS common node header magic 0x06101831, then a node type and length.
+struct = """
+  u32 magic;
+  skip[4];
+  u64 sqnum;
+  u32 len;
+  u8  node_type;
+"""
+
+constraints = [
+  "node_type <= 12",
+  "len in 32.._avail",
+]
+
+confidence = "structural"
+coalesce = true
+
+validator = "ubifs"
+
+[[magic]]
+hex = "31181006"
+endian = "little"
+
+[doc]
+description = "UBIFS filesystem (runs on top of UBI)."
+references = [
+  { title = "UBIFS documentation", url = "http://www.linux-mtd.infradead.org/doc/ubifs.html" },
+]

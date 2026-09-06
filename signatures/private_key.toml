@@ -1,0 +1,31 @@
+name = "private_key"
+category = "crypto"
+confidence = "consistent"
+
+# PEM/OpenSSH/PGP private-key armor. Distinctive multi-byte strings; whole-buffer
+# (a key embedded anywhere in a firmware image or config is what we want).
+[[magic]]
+ascii = "-----BEGIN RSA PRIVATE KEY-----"
+endian = "little"
+[[magic]]
+ascii = "-----BEGIN EC PRIVATE KEY-----"
+endian = "little"
+[[magic]]
+ascii = "-----BEGIN DSA PRIVATE KEY-----"
+endian = "little"
+[[magic]]
+ascii = "-----BEGIN PRIVATE KEY-----"
+endian = "little"
+[[magic]]
+ascii = "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+endian = "little"
+[[magic]]
+ascii = "-----BEGIN OPENSSH PRIVATE KEY-----"
+endian = "little"
+[[magic]]
+ascii = "-----BEGIN PGP PRIVATE KEY BLOCK-----"
+endian = "little"
+
+[doc]
+description = "Private key material (PEM/OpenSSH/PGP). High-value: an embedded private key."
+references = [ { title = "RFC 7468 (PEM)", url = "https://www.rfc-editor.org/rfc/rfc7468" } ]

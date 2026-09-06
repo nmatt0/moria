@@ -1,0 +1,53 @@
+name = "ext"
+category = "filesystem"
+
+# ext2/3/4 superblock lives at offset 1024; s_magic (0xEF53) is at +0x38 of the
+# superblock = 0x438 from the filesystem start.
+magic_offset = 0x438
+
+struct = """
+  skip[1024];
+  u32 s_inodes_count;
+  u32 s_blocks_count_lo;
+  skip[12];
+  u32 s_first_data_block;
+  u32 s_log_block_size;
+  skip[28];
+  u16 s_magic;
+  u16 s_state;
+"""
+
+# Hard (identity) constraints. s_first_data_block is 0 (block size > 1024) or 1
+# (block size == 1024) by spec — a 2-of-2^32 field that, with the magic + inode/
+# block counts, rejects a stray 0xEF53 at offset 0x438.
+constraints = [
+  "s_magic == 0xef53",
+  "s_inodes_count > 0",
+  "s_blocks_count_lo > 0",
+  "s_first_data_block in 0..1",
+]
+
+# Validity, not identity: block size = 1024 << s_log_block_size, so ext4 caps it
+# at 6 (64 KiB). A superblock that is otherwise a valid ext4 but has this field
+# out of range is corrupt/tampered, not a different format — surface it at
+# `magic` tier instead of dropping it (e.g. a fuzzed/attacked image).
+soft_constraints = [
+  "s_log_block_size <= 6",
+]
+soft_evidence = "ext superblock present; s_log_block_size out of range (corrupt/tampered)"
+
+# block size = 1024 << s_log_block_size; total size = blocks * block size. A
+# dump can be smaller than the recorded device size, so clamp rather than reject.
+size = "s_blocks_count_lo << (10 + s_log_block_size)"
+size_clamp = true
+confidence = "consistent"
+
+[[magic]]
+hex = "53ef"
+endian = "little"
+
+[doc]
+description = "ext2/ext3/ext4 filesystem."
+references = [
+  { title = "ext4 disk layout", url = "https://www.kernel.org/doc/html/latest/filesystems/ext4/" },
+]

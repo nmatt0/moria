@@ -1,0 +1,11 @@
+name = "pdf"
+category = "document"
+confidence = "structural"
+
+[[magic]]
+ascii = "%PDF-"
+endian = "little"
+
+[doc]
+description = "PDF document."
+references = [ { title = "PDF 32000-1:2008", url = "https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf" } ]

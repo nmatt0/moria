@@ -1,0 +1,36 @@
+name = "f2fs"
+category = "filesystem"
+
+# F2FS superblock at offset 1024; magic (0xF2F52010) is its first field.
+magic_offset = 1024
+
+struct = """
+  skip[1024];
+  u32 magic;
+  skip[12];
+  u32 log_blocksize;
+  u32 log_blocks_per_seg;
+  skip[24];
+  u32 segment_count;
+"""
+
+constraints = [
+  "magic == 0xf2f52010",
+  "log_blocksize in 9..16",
+  "log_blocks_per_seg in 1..24",
+]
+
+# Total device span = segment_count * blocks_per_seg * blocksize.
+size = "(segment_count << log_blocks_per_seg) << log_blocksize"
+size_clamp = true
+confidence = "consistent"
+
+[[magic]]
+hex = "1020f5f2"
+endian = "little"
+
+[doc]
+description = "F2FS (Flash-Friendly File System), common on Android userdata and flash storage."
+references = [
+  { title = "F2FS on-disk layout", url = "https://docs.kernel.org/filesystems/f2fs.html" },
+]

@@ -1,0 +1,34 @@
+name = "jffs2"
+category = "filesystem"
+
+# JFFS2 node magic 0x1985. Magic is only 2 bytes, so require a valid node type
+# and a sane total length to keep false positives down.
+struct = """
+  u16 magic;
+  u16 nodetype;
+  u32 totlen;
+  u32 hdr_crc;
+"""
+
+constraints = [
+  "(nodetype in 0x2003..0x2006) || (nodetype in 0xe001..0xe002)",
+  "totlen in 8.._avail",
+]
+
+confidence = "structural"
+coalesce = true
+
+validator = "jffs2"
+
+[[magic]]
+hex = "8519"
+endian = "little"
+[[magic]]
+hex = "1985"
+endian = "big"
+
+[doc]
+description = "JFFS2 (Journalling Flash File System v2)."
+references = [
+  { title = "JFFS2 design", url = "https://sourceware.org/jffs2/jffs2.pdf" },
+]

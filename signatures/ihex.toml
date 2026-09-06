@@ -1,0 +1,17 @@
+name = "ihex"
+category = "firmware"
+
+# Intel HEX is a line-oriented ASCII format; anchor at offset 0 and let the
+# validator parse the first record (fields + checksum).
+short = true
+validator = "ihex"
+
+[[magic]]
+ascii = ":"
+endian = "little"
+
+[doc]
+description = "Intel HEX firmware image (ASCII records, common for MCU flashing)."
+references = [
+  { title = "Intel HEX format", url = "https://en.wikipedia.org/wiki/Intel_HEX" },
+]

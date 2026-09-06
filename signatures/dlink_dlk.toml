@@ -1,0 +1,12 @@
+name = "dlink_dlk"
+category = "encrypted"
+confidence = "structural"
+validator = "deobf"
+# "DLK" — D-Link AES-256 firmware (two headers; per-block IV; passphrase = key).
+# Provisional; verified against a real image later.
+[[magic]]
+ascii = "DLK"
+endian = "big"
+[doc]
+description = "D-Link DLK AES-256-CBC encrypted firmware (device key table)."
+references = [ { title = "delink", url = "https://github.com/devttys0/delink" } ]

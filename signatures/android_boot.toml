@@ -1,0 +1,34 @@
+name = "android_boot"
+category = "container"
+
+# kernel_size/ramdisk_size are at the same offsets across header v0-v4.
+# init_boot images legitimately have kernel_size == 0 (ramdisk only).
+struct = """
+  bytes[8] magic;
+  u32 kernel_size;
+  u32 ramdisk_size;
+"""
+
+# The 8-byte "ANDROID!" magic is highly distinctive, so validation is light:
+# require a non-zero kernel or ramdisk. Size checks are avoided because vendor
+# stubs (e.g. Fire TV microloader) declare a kernel larger than the stub file
+# itself and v3+/vendor variants repurpose later fields.
+constraints = [
+  "kernel_size > 0 || ramdisk_size > 0",
+]
+
+confidence = "structural"
+
+# Refine the size to span the whole image (header + page-padded components) so the
+# kernel/ramdisk are region interior, not separate top-level findings.
+validator = "android_boot"
+
+[[magic]]
+ascii = "ANDROID!"
+endian = "little"
+
+[doc]
+description = "Android boot image (boot.img / init_boot / vendor_boot)."
+references = [
+  { title = "Android boot image format", url = "https://source.android.com/docs/core/architecture/bootloader/boot-image-header" },
+]

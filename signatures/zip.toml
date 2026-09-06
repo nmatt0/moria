@@ -1,0 +1,20 @@
+name = "zip"
+category = "archive"
+
+struct = """
+  skip[4];
+  u16 version;
+"""
+# "version needed to extract" is a small, sane value for real archives.
+constraints = [ "version in 10..99" ]
+confidence = "structural"
+
+validator = "zip"
+
+[[magic]]
+hex = "504b0304"
+endian = "little"
+
+[doc]
+description = "ZIP archive (or ZIP-based: docx/xlsx/epub/jar/apk)."
+references = [ { title = "ZIP APPNOTE", url = "https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT" } ]

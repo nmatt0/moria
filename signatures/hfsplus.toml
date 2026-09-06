@@ -1,0 +1,43 @@
+name = "hfsplus"
+category = "filesystem"
+
+# HFS+ / HFSX Volume Header sits at offset 1024; its signature ('H+' or 'HX') is
+# the first field there. The magics below pin the 2-byte signature together with
+# the paired version (HFS+ = 4, HFSX = 5) so the short signature does not match
+# everywhere.
+magic_offset = 1024
+
+struct = """
+  skip[1024];
+  u16 signature;
+  u16 version;
+  skip[36];
+  u32 block_size;
+  u32 total_blocks;
+"""
+
+constraints = [
+  "version in 4..5",
+  "block_size in 512..65536",
+  "(block_size & (block_size - 1)) == 0",
+  "total_blocks > 0",
+]
+
+size = "total_blocks * block_size"
+size_clamp = true
+confidence = "consistent"
+
+# 'H+' (0x482B) version 4, and 'HX' (0x4858) version 5. Big-endian.
+[[magic]]
+hex = "482b0004"
+endian = "big"
+
+[[magic]]
+hex = "48580005"
+endian = "big"
+
+[doc]
+description = "HFS+/HFSX filesystem (Apple Extended, also on some NAS/appliance images)."
+references = [
+  { title = "HFS Plus Volume Format (TN1150)", url = "https://developer.apple.com/library/archive/technotes/tn/tn1150.html" },
+]

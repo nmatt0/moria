@@ -1,0 +1,37 @@
+name = "erofs"
+category = "filesystem"
+
+# EROFS superblock at offset 1024; magic (0xE0F5E1E2) is the first field there.
+magic_offset = 1024
+
+struct = """
+  skip[1024];
+  u32 magic;
+  skip[8];
+  u8  blkszbits;
+  skip[1];
+  u16 root_nid;
+  skip[8];
+  skip[8];
+  skip[4];
+  u32 blocks;
+"""
+
+constraints = [
+  "magic == 0xe0f5e1e2",
+  "blkszbits in 9..16",
+]
+
+size = "blocks << blkszbits"
+size_clamp = true
+confidence = "consistent"
+
+[[magic]]
+hex = "e2e1f5e0"
+endian = "little"
+
+[doc]
+description = "EROFS (Enhanced Read-Only File System), common in Android partitions."
+references = [
+  { title = "EROFS on-disk format", url = "https://docs.kernel.org/filesystems/erofs.html" },
+]

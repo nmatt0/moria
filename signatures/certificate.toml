@@ -1,0 +1,17 @@
+name = "certificate"
+category = "crypto"
+confidence = "consistent"
+
+[[magic]]
+ascii = "-----BEGIN CERTIFICATE-----"
+endian = "little"
+[[magic]]
+ascii = "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+endian = "little"
+[[magic]]
+ascii = "-----BEGIN PUBLIC KEY-----"
+endian = "little"
+
+[doc]
+description = "X.509 certificate or public key (PEM)."
+references = [ { title = "RFC 7468 (PEM)", url = "https://www.rfc-editor.org/rfc/rfc7468" } ]

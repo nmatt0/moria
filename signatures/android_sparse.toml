@@ -1,0 +1,34 @@
+name = "android_sparse"
+category = "container"
+
+struct = """
+  u32 magic;
+  u16 major_version;
+  u16 minor_version;
+  u16 file_hdr_sz;
+  u16 chunk_hdr_sz;
+  u32 blk_sz;
+  u32 total_blks;
+  u32 total_chunks;
+"""
+
+constraints = [
+  "major_version == 1",
+  "file_hdr_sz == 28",
+  "chunk_hdr_sz == 12",
+  "blk_sz > 0",
+  "(blk_sz & 3) == 0",
+]
+
+confidence = "consistent"
+
+# 0xED26FF3A little-endian.
+[[magic]]
+hex = "3aff26ed"
+endian = "little"
+
+[doc]
+description = "Android sparse image (flashable, expands to a raw filesystem)."
+references = [
+  { title = "libsparse sparse_format.h", url = "https://android.googlesource.com/platform/system/core/+/master/libsparse/sparse_format.h" },
+]

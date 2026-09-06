@@ -1,0 +1,18 @@
+name = "tar"
+category = "archive"
+# POSIX ustar magic sits at offset 257 within the 512-byte header.
+magic_offset = 257
+confidence = "structural"
+
+# Walk members to the end-of-archive block: computes the whole-archive span (so
+# interior member headers are suppressed, not re-extracted) and validates the
+# header checksum (rejects a coincidental "ustar" in binary data).
+validator = "tar"
+
+[[magic]]
+ascii = "ustar"
+endian = "little"
+
+[doc]
+description = "tar archive (POSIX ustar)."
+references = [ { title = "tar / ustar (POSIX)", url = "https://pubs.opengroup.org/onlinepubs/9699919799/utilities/pax.html" } ]
