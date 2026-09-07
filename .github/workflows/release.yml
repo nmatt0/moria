@@ -1,7 +1,9 @@
 name: release
 
-# Build a prebuilt binary on every version tag (e.g. `git tag v1.0.0 && git push
-# --tags`) and attach it to the GitHub Release.
+# Build prebuilt binaries on every version tag (e.g. `git tag v1.0.0 && git push
+# --tags`) and attach one self-contained tarball per platform to the GitHub
+# Release. The binary embeds its signature sets, so each tarball is just the
+# binary plus the man page and license/readme.
 on:
   push:
     tags: ["v*"]
@@ -10,20 +12,46 @@ permissions:
   contents: write        # needed to create/update the Release
 
 jobs:
-  linux-x86_64:
-    runs-on: ubuntu-latest
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-latest
+            installer: apt
+          - name: linux-arm64
+            runner: ubuntu-24.04-arm
+            installer: apt
+          - name: macos-arm64
+            runner: macos-latest
+            installer: brew
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install build dependencies (apt)
+        if: matrix.installer == 'apt'
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake g++ python3 \
             zlib1g-dev liblzma-dev liblz4-dev libzstd-dev
 
+      - name: Install build dependencies (brew)
+        if: matrix.installer == 'brew'
+        run: |
+          brew install cmake xz lz4 zstd
+          # zlib ships with the macOS SDK; xz provides liblzma.
+
       - name: Configure and build (Release)
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          # On macOS point CMake at the Homebrew prefix so it finds the
+          # Homebrew liblzma/lz4/zstd (system zlib is found without help).
+          if [ "${{ matrix.installer }}" = "brew" ]; then
+            EXTRA="-DCMAKE_PREFIX_PATH=$(brew --prefix)"
+          fi
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release $EXTRA
           cmake --build build -j
 
       - name: Test gate
@@ -33,17 +61,20 @@ jobs:
 
       - name: Package
         run: |
-          pkg="moria-${GITHUB_REF_NAME}-linux-x86_64"
-          # The binary embeds its signature sets, so the release is just the
-          # self-contained binary plus the man page and license/readme.
+          pkg="moria-${GITHUB_REF_NAME}-${{ matrix.name }}"
           mkdir -p "dist/${pkg}"
           cp build/moria moria.1 LICENSE README.md THIRD_PARTY.md "dist/${pkg}/"
           tar -C dist -czf "${pkg}.tar.gz" "${pkg}"
-          sha256sum "${pkg}.tar.gz" > "${pkg}.tar.gz.sha256"
+          # sha256sum on Linux, shasum on macOS.
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${pkg}.tar.gz" > "${pkg}.tar.gz.sha256"
+          else
+            shasum -a 256 "${pkg}.tar.gz" > "${pkg}.tar.gz.sha256"
+          fi
 
       - name: Attach to the Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            moria-*-linux-x86_64.tar.gz
-            moria-*-linux-x86_64.tar.gz.sha256
+            moria-*-${{ matrix.name }}.tar.gz
+            moria-*-${{ matrix.name }}.tar.gz.sha256

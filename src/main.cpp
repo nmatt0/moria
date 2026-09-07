@@ -5,6 +5,9 @@
 // Help/usage layout follows the clig.dev conventions (grouped options,
 // examples, -h/--help to stdout at exit 0). See moria.1 for the man page.
 #include <unistd.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>  // _NSGetExecutablePath
+#endif
 
 #include <chrono>
 #include <cstdio>
@@ -43,12 +46,31 @@ namespace {
 // an installed FHS layout (<prefix>/bin/moria -> <prefix>/share/moria/<leaf>),
 // the per-user XDG data dir, and the system data dirs. This is the G3 fix: the
 // binary can be copied to /usr/local/bin and still find its signatures.
+// Absolute path to the running executable, or empty if it can't be determined.
+// Linux exposes it as /proc/self/exe; macOS uses _NSGetExecutablePath. Only used
+// to locate on-disk signature dirs next to an installed binary; the default build
+// embeds its signatures, so an empty result here is harmless.
+static std::filesystem::path self_exe_path() {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+#if defined(__APPLE__)
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);  // query required buffer size
+    std::string buf(size, '\0');
+    if (_NSGetExecutablePath(buf.data(), &size) != 0) return {};
+    fs::path p = fs::weakly_canonical(fs::path(buf.c_str()), ec);
+    return ec ? fs::path(buf.c_str()) : p;
+#else
+    fs::path p = fs::read_symlink("/proc/self/exe", ec);
+    return ec ? fs::path{} : p;
+#endif
+}
+
 std::vector<std::filesystem::path> sig_roots() {
     namespace fs = std::filesystem;
     std::vector<fs::path> roots;
-    std::error_code ec;
-    fs::path exe = fs::read_symlink("/proc/self/exe", ec);
-    if (!ec) {
+    fs::path exe = self_exe_path();
+    if (!exe.empty()) {
         fs::path d = exe.parent_path();
         roots.push_back(d);                          // <exe>/<leaf>
         roots.push_back(d.parent_path());            // build tree: <exe>/../<leaf>
