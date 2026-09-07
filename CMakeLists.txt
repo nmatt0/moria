@@ -174,15 +174,12 @@ add_executable(moria_unit
 target_include_directories(moria_unit PRIVATE src)
 
 # ---------------------------------------------------------------------------
-# Install (G3): the binary to <prefix>/bin and the signature sets to
-# <prefix>/share/moria/. main.cpp's sig_roots() finds them from an installed
-# <prefix>/bin/moria via the <exe>/../share/moria candidate, so the tool works
-# after `cmake --install` with no --sigs or MORIA_SIGDIR needed. The generated
-# and firmware sets install only if present in the source tree.
+# Install: just the binary and the man page. Every signature set is embedded in
+# the binary at build time (self-contained), so a default run needs nothing on
+# disk beside it. The on-disk sets are only consulted when the operator opts in
+# with --sigs DIR or $MORIA_SIGDIR, and that developer flow already has the
+# source/build tree on sig_roots(); installing ~13 MB of TOML that a normal run
+# never reads is pure bloat, so it is not installed.
 include(GNUInstallDirs)
 install(TARGETS moria RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-set(MORIA_SIGDEST ${CMAKE_INSTALL_DATADIR}/moria)
-install(DIRECTORY signatures DESTINATION ${MORIA_SIGDEST})
-install(DIRECTORY signatures-firmware DESTINATION ${MORIA_SIGDEST} OPTIONAL)
-install(DIRECTORY signatures-generated DESTINATION ${MORIA_SIGDEST} OPTIONAL)
 install(FILES moria.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 OPTIONAL)
