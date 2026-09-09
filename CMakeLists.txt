@@ -97,6 +97,7 @@ add_executable(moria
   src/validators/jffs2.cpp
   src/validators/zip.cpp
   src/validators/jpeg.cpp
+  src/validators/rae_rfp.cpp
   src/validators/tar.cpp
   src/validators/ubi.cpp
   src/validators/dtb.cpp

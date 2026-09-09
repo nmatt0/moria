@@ -1,0 +1,39 @@
+name = "rae_rfp"
+category = "firmware"
+
+# RAE Systems / Honeywell ".RFP" firmware package. 16-byte ASCII vendor magic,
+# then version + build id + a 3-byte "RAE" marker + a 16-byte digest, followed
+# by a section table. Each section is length-prefixed:
+#   u32 name_len; char name[name_len]; u32 flags; u32 usize; u32 csize; u8 data[csize]
+# flags: 0 = stored, 1 = LZARI-compressed (Honeywell NDKTool codec). The first
+# section is always "IniFile" (name_len 7). Observed sections: IniFile, HexFile,
+# BinFile, SIGN (and _1 variants on multi-image devices). The validator walks the
+# table to derive the exact container size and the compression flag.
+struct = """
+  bytes[16] magic;
+  u16  version;
+  u32  build_id;
+  bytes[3]  rae;
+  bytes[16] digest;
+  u32  name_len;
+  bytes[7]  sect0_name;
+  u32  sect0_flags;
+  u32  sect0_usize;
+  u32  sect0_csize;
+"""
+
+constraints = [
+  "version == 1",
+  "name_len == 7",
+  "sect0_flags <= 1",
+  "sect0_csize <= _avail",
+]
+
+validator = "rae_rfp"   # walks the section table -> size, compression, section count
+
+[[magic]]
+ascii = "RAE Systems Inc."
+endian = "little"
+
+[doc]
+description = "RAE Systems / Honeywell RFP firmware package (section table: IniFile/HexFile/BinFile/SIGN; sections optionally LZARI-compressed)."
