@@ -46,7 +46,7 @@ ascii = "shsq"
 endian = "little"
 
 [doc]
-description = "SquashFS v1-v3 compressed read-only filesystem (legacy embedded Linux)."
+description = "An older SquashFS version used for compressed files in Linux device software."
 references = [
   { title = "SquashFS Binary Format", url = "https://dr-emann.github.io/squashfs/" },
 ]

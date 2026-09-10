@@ -76,7 +76,8 @@ bool extract_uimage(const Reader& r, const Finding& f, SafeRoot& root, const std
             // Could not decompress (unsupported/other codec): keep the raw payload
             // so nothing is lost; a follow-up moria run can identify it.
             data.assign(src->begin(), src->end());
-            out.warnings.push_back("payload stored raw (compression not decoded)");
+            out.warnings.push_back(
+                "kept the compressed contents unchanged because they could not be unpacked");
         }
     }
 

@@ -86,12 +86,12 @@ std::string assess_file(const std::vector<Finding>& findings, size_t file_size,
 
     std::string s;
     if (types.empty()) {
-        s = "no known structures identified";
+        s = "no known file types found";
         if (entropy_on) {
             char buf[64];
             std::snprintf(buf, sizeof(buf), "%.1f", file_entropy);
-            s = "no known structures; whole-file entropy " + std::string(buf);
-            if (file_entropy >= HIGH_ENTROPY) s += " - likely encrypted or compressed";
+            s = "no known file types; whole-file randomness score " + std::string(buf);
+            if (file_entropy >= HIGH_ENTROPY) s += " - may be encrypted or compressed";
         }
     } else {
         for (size_t i = 0; i < types.size(); ++i) {
@@ -100,9 +100,11 @@ std::string assess_file(const std::vector<Finding>& findings, size_t file_size,
         }
         // Note a large unclaimed high-entropy tail/gap even when we found structures.
         if (big_high_entropy && covered < file_size)
-            s += "; high-entropy unidentified region(s) - possible encryption";
+            s += "; an unknown part has a high randomness score and may be encrypted";
     }
-    if (crypto) s += "; " + std::to_string(crypto) + " key/cert";
+    if (crypto)
+        s += "; " + std::to_string(crypto) +
+             (crypto == 1 ? " key or certificate" : " keys or certificates");
     return s;
 }
 
@@ -117,7 +119,9 @@ std::string assess_tree(const TreeResult& tr) {
         s += std::to_string(count) + " " + type;
         if (++shown >= 5) break;
     }
-    if (crypto) s += "; " + std::to_string(crypto) + " key/cert";
+    if (crypto)
+        s += "; " + std::to_string(crypto) +
+             (crypto == 1 ? " key or certificate" : " keys or certificates");
     return s;
 }
 

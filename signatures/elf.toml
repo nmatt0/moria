@@ -24,7 +24,7 @@ hex = "7f454c46"
 endian = "little"
 
 [doc]
-description = "ELF executable/shared object/relocatable object."
+description = "ELF program, program library, or reusable program code."
 references = [
   { title = "ELF specification (System V ABI)", url = "https://refspecs.linuxfoundation.org/elf/elf.pdf" },
 ]

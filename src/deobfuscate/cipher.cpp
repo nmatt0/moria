@@ -1,6 +1,6 @@
 // cipher.cpp — internal AES-CBC (decrypt). Standard FIPS-197 byte-oriented
-// implementation; clean-room, no external crypto library. Validated against the
-// FIPS-197 AES-128 and AES-256 known-answer vectors in the unit tests.
+// implementation written for moria without an outside encryption library. Unit
+// tests compare it with the published FIPS-197 AES-128 and AES-256 examples.
 #include "deobfuscate/cipher.hpp"
 
 #include <algorithm>

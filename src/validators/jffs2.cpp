@@ -10,7 +10,7 @@ bool validate_jffs2(ValidatorCtx& ctx) {
     auto hdr = ctx.reader.bytes(ctx.offset, 8);
     if (!hdr) return true;
     if (crc32_jffs2(*hdr) == static_cast<uint32_t>(it->second))
-        ctx.out.set_confidence(Confidence::Verified, "node header CRC ok");
+        ctx.out.set_confidence(Confidence::Verified, "record header checksum matches");
     return true;
 }
 

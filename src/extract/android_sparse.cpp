@@ -160,12 +160,13 @@ bool extract_android_sparse(const Reader& r, const Finding& f, SafeRoot& root,
             out.symlinks += e2.symlinks;
             out.bytes += e2.bytes;
             inner_files = e2.files;
-            for (auto& w : e2.warnings) out.warnings.push_back("fs: " + w);
+            for (auto& w : e2.warnings) out.warnings.push_back("file system: " + w);
             if (e2.status == "partial") truncated = true;
         }
     }
     if (inner_files == 0)
-        out.warnings.push_back("inner filesystem not auto-extracted; see unsparsed.img");
+        out.warnings.push_back("file system inside the image was not unpacked automatically; "
+                               "see unsparsed.img");
 
     out.status = truncated ? "partial" : "ok";
     return true;

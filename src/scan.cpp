@@ -25,10 +25,10 @@ Finding make_finding(const Signature& sig) {
 
 const char* tier_evidence(Confidence c) {
     switch (c) {
-        case Confidence::Magic: return "magic match";
-        case Confidence::Structural: return "header fields satisfy constraints";
-        case Confidence::Consistent: return "cross-field checks consistent";
-        case Confidence::Verified: return "content verified";
+        case Confidence::Magic: return "identifying byte pattern found";
+        case Confidence::Structural: return "file layout matches the format";
+        case Confidence::Consistent: return "details in the file agree";
+        case Confidence::Verified: return "file contents passed an extra check";
         case Confidence::Reject: return "";
     }
     return "";

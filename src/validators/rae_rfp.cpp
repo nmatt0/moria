@@ -81,9 +81,9 @@ bool validate_rae_rfp(ValidatorCtx& ctx) {
     if (!first_name.empty()) ctx.out.label = first_name;  // first section (always "IniFile")
 
     if (off == r.size())
-        ctx.out.set_confidence(Confidence::Verified, "section table spans file exactly");
+        ctx.out.set_confidence(Confidence::Verified, "section list reaches the end of the file");
     else
-        ctx.out.set_confidence(Confidence::Consistent, "section table parsed");
+        ctx.out.set_confidence(Confidence::Consistent, "section list could be read");
     return true;
 }
 

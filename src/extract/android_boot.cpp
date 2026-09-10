@@ -109,7 +109,8 @@ bool extract_android_boot(const Reader& r, const Finding& f, SafeRoot& root,
         // whose payload lives elsewhere, not a normal extraction failure.
         out.status = "error:no-components";
         if (truncated)
-            out.warnings.push_back("declared components exceed available data (boot stub?)");
+            out.warnings.push_back(
+                "listed parts extend past the available data; this may be a boot stub");
         return true;
     }
     out.status = truncated ? "partial" : "ok";

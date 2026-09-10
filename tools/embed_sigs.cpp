@@ -1,12 +1,11 @@
-// embed_sigs.cpp — build-time codegen: read every signatures*/*.toml and emit a
-// C++ source that embeds them, so the moria binary is self-contained (no runtime
-// signature directory). Run by CMake; not part of the shipped binary.
+// Build helper: read every signatures*/*.toml file and create a C++ source file
+// containing those rules. This lets moria run without a separate rules folder.
+// CMake runs this helper; it is not included in the released program.
 //
 // Usage: embed_sigs <out.cpp> <curated_dir> <firmware_dir> <generated_dir>
 //
-// Each TOML file becomes a raw string literal (fast to compile, byte-exact). The
-// generated file defines embedded_curated()/embedded_firmware()/embedded_generated()
-// declared in sigload.hpp.
+// Each TOML file is stored as an unchanged C++ string. The new file defines the
+// three functions declared in sigload.hpp.
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
@@ -26,7 +25,7 @@ static std::string read_file(const fs::path& p) {
     return ss.str();
 }
 
-// Sorted list of *.toml files directly under `dir` (deterministic order).
+// List *.toml files directly inside `dir`, sorted the same way on every run.
 static std::vector<fs::path> toml_files(const fs::path& dir) {
     std::vector<fs::path> out;
     std::error_code ec;

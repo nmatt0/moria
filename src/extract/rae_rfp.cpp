@@ -84,7 +84,8 @@ bool extract_rae_rfp(const Reader& r, const Finding& f, SafeRoot& root, const st
                 // nothing is lost, and flag it.
                 data.assign(src->begin(), src->end());
                 any_fail = true;
-                out.warnings.push_back(fname + ": lzari decode failed, stored raw");
+                out.warnings.push_back(fname +
+                                       ": could not unpack LZARI data; kept it unchanged");
             }
         } else {
             data.assign(src->begin(), src->end());

@@ -26,7 +26,7 @@ ascii = "MIDAS-"
 endian = "little"
 
 [doc]
-description = "Lantronix device-server firmware container (NUEVO-/MIDAS- header)."
+description = "Lantronix device-server firmware package that starts with a NUEVO- or MIDAS- marker."
 references = [
   { title = "Lantronix firmware (device servers: xPort, EDS, PremierWave)", url = "https://www.lantronix.com/" },
 ]

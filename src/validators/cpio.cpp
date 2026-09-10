@@ -44,7 +44,7 @@ bool validate_cpio(ValidatorCtx& ctx) {
                        std::string(reinterpret_cast<const char*>(magic->data()), 6) == "070702");
     if (!newc) {
         // odc (070707): octal fields; accept on magic alone.
-        ctx.out.set_confidence(Confidence::Magic, "cpio odc magic");
+        ctx.out.set_confidence(Confidence::Magic, "cpio odc identifying bytes found");
         return true;
     }
 
@@ -60,11 +60,11 @@ bool validate_cpio(ValidatorCtx& ctx) {
     const uint64_t size = align4(110 + *c_namesize) + align4(*c_filesize);
     if (size == 0 || size > avail) {
         // Header parsed but size implausible; still a valid-looking entry.
-        ctx.out.set_confidence(Confidence::Structural, "cpio newc header");
+        ctx.out.set_confidence(Confidence::Structural, "cpio newc header could be read");
         return true;
     }
     ctx.out.size = size;
-    ctx.out.set_confidence(Confidence::Consistent, "cpio newc entry, size computed");
+    ctx.out.set_confidence(Confidence::Consistent, "cpio newc item and size checked");
     return true;
 }
 

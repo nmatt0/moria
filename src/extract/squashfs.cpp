@@ -434,7 +434,7 @@ void walk(Ctx& c, uint64_t ref, const std::string& rel, size_t depth) {
         case 2:
         case 9: {  // file
             if (c.out.bytes + node.file_size > c.byte_budget) {
-                c.out.warnings.push_back("skipped (exceeds size budget): " + rel);
+                c.out.warnings.push_back("skipped because it exceeds the size limit: " + rel);
                 c.truncated = true;
                 return;
             }
@@ -519,8 +519,8 @@ bool extract_squashfs(const Reader& r, const Finding& f, SafeRoot& root, const s
         if (obfuscated) {
             out.warnings.push_back(
                 std::string(compressor_name(c.comp)) +
-                " payload did not decode despite a valid squashfs structure - likely "
-                "vendor obfuscation/encryption of the compressed data (not a moria limitation)");
+                " contents could not be unpacked even though the SquashFS layout is valid; "
+                "the vendor probably scrambled or encrypted the compressed data");
             out.status = "error:undecodable-payload";
             return true;
         }

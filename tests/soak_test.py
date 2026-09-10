@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Big real-data soak test: run moria identify + extract + carve over a broad,
-size-tiered sample of a local firmware corpus and flag anomalies (crashes,
-hangs, non-JSON output, extraction failures, carve-fidelity breaks).
+"""Check many real firmware files for crashes, hangs, bad output, and data loss.
 
-Not a pass/fail gate — a bug-finding harness. Output (which echoes corpus
-filenames) goes to the gitignored diff-report/soak/, never committed.
+This is a long-running bug search, not a required pass-or-fail check. It checks
+a range of file sizes from a local firmware collection. Reports may include the
+test filenames, so they are written to the Git-ignored diff-report/soak/ folder.
 
-Small samples run under the ASan build (catches memory bugs); larger ones run
-under the release build (speed). Extract/carve outputs are written to a scratch
-dir and deleted after each sample unless an anomaly is found.
+Small files use the AddressSanitizer build to catch memory errors. Larger files
+use the faster release build. Unpacked and copied files are written to a working
+folder and removed after each example unless a problem is found.
 
 Usage: tests/soak_test.py [--per-cat N] [--max-mb N] [--corpus DIR] [--scratch DIR]
 """
@@ -42,9 +41,7 @@ def die(m):
 
 
 def pick_samples(corpus, per_cat, max_bytes):
-    """Diverse selection: up to per_cat files per category dir, smallest first
-    (so the soak stays fast) but sample across the size range by taking a few
-    larger ones too. Skips files over max_bytes."""
+    """Choose varied file sizes from each group without making the check too slow."""
     picked = []
     for cat in sorted(os.listdir(corpus)):
         cdir = os.path.join(corpus, cat)
@@ -90,10 +87,14 @@ def crashed(rc):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--per-cat", type=int, default=12)
-    ap.add_argument("--max-mb", type=int, default=400)
-    ap.add_argument("--corpus", default=os.environ.get("MORIA_CORPUS", "corpus"))
-    ap.add_argument("--scratch", default=None)
+    ap.add_argument("--per-cat", type=int, default=12,
+                    help="maximum files from each group")
+    ap.add_argument("--max-mb", type=int, default=400,
+                    help="skip files larger than this many MiB")
+    ap.add_argument("--corpus", default=os.environ.get("MORIA_CORPUS", "corpus"),
+                    help="folder containing the local firmware collection")
+    ap.add_argument("--scratch", default=None,
+                    help="working folder for unpacked and copied files")
     args = ap.parse_args()
 
     if not os.path.exists(REL):
@@ -113,8 +114,8 @@ def main():
     print(f"selected {len(samples)} samples across "
           f"{len(set(c for c, _, _ in samples))} categories; scratch={scratch}")
 
-    anomalies = []           # high-signal: crashes, hangs, bad output, fidelity breaks
-    notes = []               # lower-signal: partials, misses, empty extracts
+    anomalies = []           # Serious problems: crashes, hangs, bad output, or changed bytes.
+    notes = []               # Less serious problems: incomplete or empty results.
     stats = {"id": 0, "ex": 0, "cv": 0}
 
     def record(kind, cat, path, op, msg, extra=None):
@@ -212,19 +213,19 @@ def main():
             record("ANOMALY", cat, path, "carve", f"CRASH rc={rc}", {"stderr": errs[-800:]})
             cv_anom = True
         else:
-            # carve fidelity: spot-check the first carved blob is byte-identical
+            # Check that the first copied section exactly matches the source bytes.
             man = os.path.join(cvd, "manifest.json")
             if os.path.exists(man):
                 try:
                     m = json.load(open(man))
                     fdata = open(path, "rb").read() if sz <= ASAN_CAP else None
                     for e in (m.get("carved") or [])[:1]:
-                        blob = os.path.join(cvd, e["file"])
-                        if fdata is not None and os.path.exists(blob):
-                            b = open(blob, "rb").read()
+                        copied_file = os.path.join(cvd, e["file"])
+                        if fdata is not None and os.path.exists(copied_file):
+                            b = open(copied_file, "rb").read()
                             if b != fdata[e["offset"]:e["offset"] + e["size"]]:
                                 record("ANOMALY", cat, path, "carve",
-                                       f"FIDELITY break on {e['file']}")
+                                       f"COPIED BYTES DIFFER for {e['file']}")
                                 cv_anom = True
                 except Exception as e:
                     record("note", cat, path, "carve", f"manifest parse: {e}")
@@ -243,7 +244,7 @@ def main():
         f.write(f"# moria soak — {len(samples)} samples, {time.strftime('%Y-%m-%d %H:%M')}\n\n")
         f.write(f"identify x{stats['id']}, extract x{stats['ex']}, carve x{stats['cv']}. "
                 f"**{len(anomalies)} anomalies, {len(notes)} notes.**\n\n")
-        f.write("## Anomalies (crashes / hangs / bad output / fidelity)\n\n")
+        f.write("## Problems (crashes, hangs, bad output, or changed bytes)\n\n")
         for a in anomalies:
             f.write(f"- **{a['op']}** [{a['cat']}] `{a['file']}` — {a['msg']}\n")
         if not anomalies:

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""SquashFS extraction regression: build a known tree, squash it with each
-compressor, extract with moria, and assert the tree round-trips byte-for-byte.
+"""Check that moria unpacks SquashFS files without changing their contents.
 
-Deterministic and self-contained, but needs `mksquashfs` (squashfs-tools) to
-build fixtures. Skips (exit 0) if mksquashfs is absent so it never blocks a
-build on a host without it. Run: python3 tests/test_extract.py
+The check builds a known folder tree with each supported compression type,
+unpacks it with moria, and compares every output byte with the original. It
+needs `mksquashfs` from squashfs-tools. If that program is unavailable, the
+check is skipped. Run: python3 tests/test_extract.py
 """
 import hashlib
 import json

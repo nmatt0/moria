@@ -142,7 +142,7 @@ bool extract_zip(const Reader& r, const Finding& f, SafeRoot& root, const std::s
             continue;
         }
         if (*flags & FLAG_ENCRYPTED) {
-            out.warnings.push_back("encrypted, skipped: " + name);
+            out.warnings.push_back("skipped encrypted file: " + name);
             truncated = true;
             continue;
         }
@@ -172,7 +172,8 @@ bool extract_zip(const Reader& r, const Finding& f, SafeRoot& root, const std::s
         } else if (*method == METHOD_ZSTD) {
             if (auto d = decompress(Compressor::Zstd, *src, static_cast<size_t>(uncomp))) { data = std::move(*d); ok = data.size() == uncomp; }
         } else {
-            out.warnings.push_back("unsupported method " + std::to_string(*method) + ": " + name);
+            out.warnings.push_back("compression method " + std::to_string(*method) +
+                                   " is not supported: " + name);
             truncated = true;
             continue;
         }

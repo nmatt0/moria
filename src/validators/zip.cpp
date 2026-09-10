@@ -30,7 +30,7 @@ bool validate_zip(ValidatorCtx& ctx) {
     if (eocd_end > filesz) return true;
 
     ctx.out.size = eocd_end - base;
-    ctx.out.set_confidence(Confidence::Consistent, "EOCD found, archive size computed");
+    ctx.out.set_confidence(Confidence::Consistent, "ZIP end record found and archive size checked");
     return true;
 }
 

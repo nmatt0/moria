@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <map>
 #include <set>
@@ -61,6 +62,16 @@ std::string hex_off(size_t o) {
     return buf;
 }
 
+// Plain-language labels for the checks behind each confidence level. The JSON
+// values stay unchanged so existing programs continue to work.
+const char* check_name(const std::string& tier) {
+    if (tier == "magic") return "byte pattern";
+    if (tier == "structural") return "file layout";
+    if (tier == "consistent") return "details agree";
+    if (tier == "verified") return "verified";
+    return "unknown";
+}
+
 // Printable, length-capped, control-stripped rendering of an embedded label.
 std::string clean_label(const std::string& s, size_t cap = 40) {
     std::string out;
@@ -85,7 +96,8 @@ std::string notes_for(const Finding& f) {
     if (!f.compression.empty()) parts.push_back(f.compression);
     if (f.coalesced_count > 1) parts.push_back("x" + std::to_string(f.coalesced_count));
     if (!f.members.empty())
-        parts.push_back(std::to_string(f.members.size()) + (f.members_truncated ? "+ members" : " members"));
+        parts.push_back(std::to_string(f.members.size()) +
+                        (f.members_truncated ? "+ items" : " items"));
     std::string s;
     for (size_t i = 0; i < parts.size(); ++i) s += (i ? " " : "") + parts[i];
     if (!f.label.empty()) s += (s.empty() ? "" : "  ") + ("\"" + clean_label(f.label) + "\"");
@@ -250,13 +262,13 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
         }
         return w;
     };
-    size_t w_off = 6, w_size = 4, w_type = 4, w_tier = 4;
+    size_t w_off = 10, w_size = 4, w_type = 4, w_tier = 11;
     for (const auto& r : rows) {
         if (r.f) {
             w_off = std::max(w_off, disp_w(r.first));
             w_size = std::max(w_size, human_size(r.f->size).size());
             w_type = std::max(w_type, r.f->type.size());
-            w_tier = std::max(w_tier, r.f->confidence_tier.size());
+            w_tier = std::max(w_tier, std::strlen(check_name(r.f->confidence_tier)));
         } else if (r.mem) {
             w_off = std::max(w_off, disp_w(r.first));
             w_size = std::max(w_size, human_size(r.mem->size).size());
@@ -265,13 +277,13 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
     }
     o += p.dim();
     std::string h;
-    col(h, "OFFSET", w_off, "", "");
+    col(h, "START BYTE", w_off, "", "");
     h += "  ";
     col(h, "SIZE", w_size, "", "");
     h += "  ";
     col(h, "TYPE", w_type, "", "");
     h += "  ";
-    col(h, "TIER", w_tier, "", "");
+    col(h, "HOW CHECKED", w_tier, "", "");
     h += "  NOTES";
     o += h + p.reset() + "\n";
 
@@ -304,7 +316,8 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
         line += "  ";
         col(line, r.f->type, w_type, p.sec(*r.f), p.reset());
         line += "  ";
-        col(line, r.f->confidence_tier, w_tier, p.tier(r.f->confidence_tier), p.reset());
+        col(line, check_name(r.f->confidence_tier), w_tier, p.tier(r.f->confidence_tier),
+            p.reset());
         line += "  ";
         line += p.dim() + notes_for(*r.f) + p.reset();
         while (!line.empty() && line.back() == ' ') line.pop_back();
@@ -319,7 +332,7 @@ std::string emit_file_human(const std::vector<Finding>& findings,
     std::string o;
     if (findings.empty()) {
         o += p.dim();
-        o += "No known structures identified.\n";
+        o += "No known file types found.\n";
         o += p.reset();
     } else {
         emit_findings_tree(o, p, findings, all);
@@ -327,13 +340,13 @@ std::string emit_file_human(const std::vector<Finding>& findings,
 
     if (!regions.empty()) {
         o += p.dim();
-        o += "\nunidentified regions:\n";
+        o += "\nParts not identified:\n";
         o += p.reset();
         for (const auto& r : regions) {
             char buf[128];
-            std::snprintf(buf, sizeof(buf), "  %-10s %-9s  entropy %.2f%s\n", hex_off(r.offset).c_str(),
-                          human_size(r.size).c_str(), r.entropy,
-                          r.entropy >= 7.2 ? "  (likely encrypted/compressed)" : "");
+            std::snprintf(buf, sizeof(buf), "  %-10s %-9s  randomness %.2f%s\n",
+                          hex_off(r.offset).c_str(), human_size(r.size).c_str(), r.entropy,
+                          r.entropy >= 7.2 ? "  (may be encrypted or compressed)" : "");
             o += buf;
         }
     }
@@ -359,7 +372,7 @@ std::string emit_tree_human(const TreeResult& tr, const std::string& footer, boo
 
     if (!tr.by_type.empty()) {
         o += p.dim();
-        o += "by type:  ";
+        o += "By file type:  ";
         o += p.reset();
         for (size_t i = 0; i < tr.by_type.size(); ++i) {
             if (i) o += p.dim(), o += " · ", o += p.reset();
@@ -381,7 +394,7 @@ std::string emit_tree_human(const TreeResult& tr, const std::string& footer, boo
         w_base = std::min<size_t>(w_base, 52);
 
         o += p.dim();
-        o += "\nnotable (" + std::to_string(tr.notable.size()) + "):\n";
+        o += "\nImportant matches (" + std::to_string(tr.notable.size()) + "):\n";
         o += p.reset();
 
         // Notable is path-sorted, so entries in the same directory are already

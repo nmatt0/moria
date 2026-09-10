@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""One-shot clean-room re-authoring of signatures-firmware/firmware.toml descriptions.
+"""Rewrite descriptions in signatures-firmware/firmware.toml in moria's own words.
 
-The firmware magic BYTE PATTERNS and offsets are facts (kept verbatim). The
-`name` slugs are factual vendor/format identifiers (kept). Only the human
-`description` text is regenerated here, from a uniform template of our own
-(display-name + the magic + offset), so no third-party prose survives. Run once;
-after this the file is maintained by hand or by re-running with fresh input.
+The identifying bytes, their starting positions, and the vendor or format names
+stay unchanged. Each description is replaced with the same simple pattern:
+readable name, identifying bytes, and starting byte. Descriptions from the
+source database are not kept. Run this after importing a new set of rules.
 
 Usage: python3 tools/reauthor_firmware_desc.py   # rewrites the toml in place
 """
@@ -14,8 +13,8 @@ import sys
 
 PATH = "signatures-firmware/firmware.toml"
 
-# Display fixups: uppercase real acronyms / correct vendor casing so the
-# generated descriptions read as facts, not as slugs. Token -> replacement.
+# Capitalization used when turning stored names into names people can read.
+# Stored word -> displayed word.
 FIX = {
     "tp": "TP", "link": "Link", "vxworks": "VxWorks", "uefi": "UEFI",
     "rtos": "RTOS", "spi": "SPI", "emmc": "eMMC", "nor": "NOR", "cfe": "CFE",
@@ -46,8 +45,8 @@ FIX = {
 }
 
 
-def humanize(slug):
-    words = [w for w in slug.split("_") if w]
+def readable_name(stored_name):
+    words = [w for w in stored_name.split("_") if w]
     out = []
     for w in words:
         if w in FIX:
@@ -70,7 +69,7 @@ def toml_escape(s):
 
 def main():
     text = open(PATH).read()
-    # split off the leading comment header, keep the signature blocks
+    # Replace the opening comments and keep the rule blocks.
     parts = re.split(r'(?m)^(?=\[\[signature\]\])', text, maxsplit=1)
     if len(parts) != 2:
         sys.exit("could not find first [[signature]] block")
@@ -78,10 +77,10 @@ def main():
     blocks = re.split(r'(?m)^(?=\[\[signature\]\])', body)
 
     header = (
-        "# Firmware-vendor magic-tier signatures for moria.\n"
-        "# Byte patterns and offsets are facts about real firmware formats.\n"
-        "# Descriptions are original (name + identifying magic + offset); no\n"
-        "# third-party prose is reproduced. See THIRD_PARTY.md for provenance.\n\n"
+        "# Firmware file-recognition rules for moria.\n"
+        "# The byte patterns and their positions describe real firmware formats.\n"
+        "# Descriptions use moria's own wording: name, identifying bytes, and\n"
+        "# starting byte. See THIRD_PARTY.md for source and license details.\n\n"
     )
 
     out = [header]
@@ -93,16 +92,16 @@ def main():
         off = re.search(r'magic_offset = (\d+)', blk)
         off = off.group(1) if off else "0"
         hx = re.search(r'hex = "([0-9a-f]+)"', blk).group(1)
-        desc = f"{humanize(name)}; identifying magic {magic_repr(hx)} at offset {off}"
-        # Match the whole doc line (greedy .* handles embedded escaped quotes in
-        # the original third-party text, e.g. ZyXEL's name: \"%s\").
+        desc = f"{readable_name(name)}; recognized by bytes {magic_repr(hx)} starting at byte {off}"
+        # Match the whole description line. The broad match also handles quoted
+        # text inside older descriptions, such as ZyXEL's name: \"%s\".
         blk = re.sub(r'(?m)^doc = \{ description = ".*" \}$',
                      f'doc = {{ description = "{toml_escape(desc)}" }}', blk)
         out.append(blk if blk.endswith("\n") else blk + "\n")
         n += 1
 
     open(PATH, "w").write("".join(out))
-    print(f"re-authored {n} descriptions in {PATH}")
+    print(f"rewrote {n} descriptions in {PATH}")
 
 
 if __name__ == "__main__":

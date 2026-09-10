@@ -10,11 +10,10 @@
 
 namespace ft {
 
-// Reverse a recognized vendor transform (the finding's `type` names the scheme),
-// write the validated plaintext as `descrambled.bin`, and let the extraction
-// recursion identify + unpack it. The scheme + key + validated magic are recorded
-// as a manifest warning for provenance. The encrypted bytes are not copied here
-// (the input holds them; `-c` carves the exact range).
+// Undo a recognized vendor scrambling method, write the checked result as
+// `descrambled.bin`, and let moria identify and unpack it. A warning records the
+// method, key description, and recognized file type. The encrypted bytes remain
+// in the input; `-c` can copy that exact section.
 bool extract_descramble(const Reader& r, const Finding& f, SafeRoot& root,
                         const std::string& subdir, Extracted& out);
 

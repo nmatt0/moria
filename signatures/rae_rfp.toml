@@ -36,4 +36,4 @@ ascii = "RAE Systems Inc."
 endian = "little"
 
 [doc]
-description = "RAE Systems / Honeywell RFP firmware package (section table: IniFile/HexFile/BinFile/SIGN; sections optionally LZARI-compressed)."
+description = "RAE Systems / Honeywell RFP firmware package with named sections that may use LZARI compression."

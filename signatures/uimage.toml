@@ -29,7 +29,7 @@ hex = "27051956"
 endian = "big"
 
 [doc]
-description = "U-Boot legacy uImage: kernel/ramdisk container with a CRC-checked header."
+description = "An older U-Boot uImage package containing a kernel or startup file, with a checked header."
 references = [
   { title = "U-Boot image format (image.h)", url = "https://source.denx.de/u-boot/u-boot/-/blob/master/include/image.h" },
 ]

@@ -53,15 +53,16 @@ bool validate_squashfs(ValidatorCtx& ctx) {
     if (auto m = r.bytes(ctx.offset, 4);
         m && std::memcmp(m->data(), "hsqs", 4) != 0 && std::memcmp(m->data(), "sqsh", 4) != 0)
         ctx.out.limitations.push_back(
-            "non-standard magic '" + std::string(reinterpret_cast<const char*>(m->data()), 4) +
-            "' (vendor-modified squashfs)");
+            "non-standard starting bytes '" +
+            std::string(reinterpret_cast<const char*>(m->data()), 4) +
+            "' (SquashFS changed by the vendor)");
     if (!(field(f, "flags") & 0x0400)) {  // no compressor-options block -> first block is data
         if (auto b0 = r.bytes(ctx.offset + V4_HEADER_SIZE, 1)) {
             uint64_t sniff = (*b0)[0] == 0x5d ? 2 : ((*b0)[0] == 0x78 ? 1 : 0);
             if (sniff && sniff != declared) {
                 const char* real = compression_name(sniff);
                 const char* named = compression_name(declared);
-                ctx.out.compression = std::string(real) + " (field claims " +
+                ctx.out.compression = std::string(real) + " (header says " +
                                       (named ? named : "?") + ")";
             }
         }
@@ -70,9 +71,10 @@ bool validate_squashfs(ValidatorCtx& ctx) {
     const uint64_t id_table = field(f, "id_table_start");
     const uint64_t bytes_used = field(f, "bytes_used");
     if (id_table >= V4_HEADER_SIZE && id_table <= bytes_used)
-        ctx.out.set_confidence(Confidence::Consistent, "v4 header + id table pointer sane");
+        ctx.out.set_confidence(Confidence::Consistent,
+                               "version 4 header and ID table location are valid");
     else
-        ctx.out.set_confidence(Confidence::Structural, "v4 header fields consistent");
+        ctx.out.set_confidence(Confidence::Structural, "version 4 header values are valid");
     return true;
 }
 

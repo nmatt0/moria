@@ -20,7 +20,7 @@ hex = "04224d18"
 endian = "little"
 
 [doc]
-description = "LZ4 frame-format compressed data."
+description = "Data compressed in the standard LZ4 file format."
 references = [
   { title = "LZ4 Frame Format", url = "https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md" },
 ]

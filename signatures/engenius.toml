@@ -12,7 +12,7 @@ hex = "12345678616c6c"
 endian = "big"
 
 [doc]
-description = "EnGenius XOR-obfuscated firmware (keyless; decryptable)."
+description = "EnGenius firmware scrambled with XOR; moria can restore it without a separate key."
 references = [
   { title = "unblob Engenius handler", url = "https://github.com/onekey-sec/unblob" },
 ]

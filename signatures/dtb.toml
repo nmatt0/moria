@@ -36,7 +36,7 @@ hex = "d00dfeed"
 endian = "big"
 
 [doc]
-description = "Flattened Device Tree blob (FDT/DTB), describes hardware to the kernel/bootloader."
+description = "Flattened Device Tree (FDT/DTB) file; tells the kernel or startup program about the hardware."
 references = [
   { title = "Devicetree Specification", url = "https://www.devicetree.org/specifications/" },
 ]

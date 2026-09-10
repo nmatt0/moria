@@ -44,7 +44,7 @@ bool validate_ihex(ValidatorCtx& ctx) {
     }
     auto checksum = hex_byte(r, pos);
     if (checksum && ((sum + *checksum) & 0xFF) == 0) {
-        ctx.out.set_confidence(Confidence::Consistent, "valid Intel HEX record + checksum");
+        ctx.out.set_confidence(Confidence::Consistent, "Intel HEX record and checksum are valid");
         return true;
     }
 
@@ -59,7 +59,8 @@ bool validate_ihex(ValidatorCtx& ctx) {
         bool is_hex = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
         if (is_hex) { ++hexrun; continue; }
         if ((ch == '\r' || ch == '\n') && hexrun >= 8) {
-            ctx.out.set_confidence(Confidence::Structural, "ASCII hex records (non-standard variant)");
+            ctx.out.set_confidence(Confidence::Structural,
+                                   "plain-text hex records in a non-standard form");
             return true;
         }
         break;

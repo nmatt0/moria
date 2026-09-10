@@ -72,9 +72,9 @@ bool validate_uimage(ValidatorCtx& ctx) {
     }
 
     if (got == want)
-        ctx.out.set_confidence(Confidence::Verified, "header CRC32 ok");
+        ctx.out.set_confidence(Confidence::Verified, "header checksum matches");
     else
-        ctx.out.set_confidence(Confidence::Structural, "header CRC32 mismatch");
+        ctx.out.set_confidence(Confidence::Structural, "header checksum does not match");
     return true;
 }
 

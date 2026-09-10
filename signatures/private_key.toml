@@ -27,5 +27,5 @@ ascii = "-----BEGIN PGP PRIVATE KEY BLOCK-----"
 endian = "little"
 
 [doc]
-description = "Private key material (PEM/OpenSSH/PGP). High-value: an embedded private key."
+description = "A private PEM, OpenSSH, or PGP key stored inside the file; review it as sensitive data."
 references = [ { title = "RFC 7468 (PEM)", url = "https://www.rfc-editor.org/rfc/rfc7468" } ]

@@ -81,7 +81,7 @@ std::vector<Finding> resolve(std::vector<Finding> candidates, size_t file_size,
                 size_t end = std::max(m.offset + m.size, f.offset + f.size);
                 m.size = end - m.offset;
                 m.coalesced_count += 1;
-                m.evidence = std::to_string(m.coalesced_count) + " flash regions coalesced";
+                m.evidence = std::to_string(m.coalesced_count) + " flash areas combined";
                 continue;
             }
             f.coalesced_count = 1;

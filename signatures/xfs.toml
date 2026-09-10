@@ -35,7 +35,7 @@ hex = "58465342"
 endian = "big"
 
 [doc]
-description = "XFS filesystem (SGI/Linux extent-based, common on RHEL and NAS/appliance images)."
+description = "XFS file system, often used by RHEL Linux and network storage devices."
 references = [
   { title = "XFS Algorithms & Data Structures", url = "https://mirror.math.princeton.edu/pub/kernel/linux/utils/fs/xfs/docs/xfs_filesystem_structure.pdf" },
 ]

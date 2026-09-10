@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Synthetic, minimal, valid-enough samples for each supported format.
+"""Make small example files for each supported format.
 
-Every builder crafts just enough of a header (and, where the validator needs it,
-correct CRCs/derived sizes) that moria identifies it. These are deterministic
-fixtures for dev and regression testing, independent of the big external corpora.
+Each builder creates enough valid file information for moria to recognize the
+format. It includes correct checksums and sizes where needed. The same examples
+are produced every time and do not rely on outside test-file collections.
 
-`MANIFEST` pairs each sample with the expected finding type and minimum
-confidence. Run standalone to drop the fixtures into tests/samples/ for
-inspection; `tests/test_samples.py` uses the builders + MANIFEST directly.
+`MANIFEST` lists each sample's expected file type and minimum confidence score.
+Run this file directly to create the examples in tests/samples/ for inspection.
+`tests/test_samples.py` uses the builders and `MANIFEST` directly.
 """
 import os
 import struct
 import zlib
 
-# confidence tiers (mirror finding.hpp)
+# Confidence scores from finding.hpp.
 MAGIC, STRUCTURAL, CONSISTENT, VERIFIED = 25, 60, 85, 99
 
 
@@ -666,4 +666,4 @@ if __name__ == "__main__":
     import sys
     outdir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "samples")
     n = write_all(outdir)
-    print(f"wrote {n} synthetic samples to {outdir}")
+    print(f"wrote {n} made-up sample files to {outdir}")

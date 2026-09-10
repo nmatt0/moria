@@ -25,7 +25,7 @@ hex = "31181006"
 endian = "little"
 
 [doc]
-description = "UBIFS filesystem (runs on top of UBI)."
+description = "A UBIFS file system stored inside UBI."
 references = [
   { title = "UBIFS documentation", url = "http://www.linux-mtd.infradead.org/doc/ubifs.html" },
 ]

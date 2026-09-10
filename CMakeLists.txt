@@ -11,17 +11,18 @@ endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 
-# Optional sanitizers for debug builds: cmake -DFT_SANITIZE=ON
+# Optional memory and undefined-behavior checks for debug builds:
+# cmake -DFT_SANITIZE=ON
 option(FT_SANITIZE "Build with ASan+UBSan" OFF)
 if(FT_SANITIZE)
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
   add_link_options(-fsanitize=address,undefined)
 endif()
 
-# Embed the signature TOML sets into the binary so it is self-contained (no
-# runtime signature directory). tools/embed_sigs is a tiny host codegen tool that
-# reads the sets at build time and emits a C++ source; --sigs / $MORIA_SIGDIR
-# still override with external TOML on disk.
+# Build the TOML file-recognition rules into the program so it does not need a
+# rules folder when it runs. tools/embed_sigs reads the rules during the build
+# and creates a C++ source file. --sigs and $MORIA_SIGDIR can still select TOML
+# rules stored elsewhere.
 add_executable(embed_sigs tools/embed_sigs.cpp)
 set(EMBED_OUT ${CMAKE_BINARY_DIR}/generated/signatures_embedded.cpp)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/generated)
@@ -36,7 +37,7 @@ add_custom_command(
           ${CMAKE_SOURCE_DIR}/signatures-firmware
           ${CMAKE_SOURCE_DIR}/signatures-generated
   DEPENDS embed_sigs ${SIG_TOML}
-  COMMENT "Embedding signature sets into the binary")
+  COMMENT "Adding file-recognition rules to the program")
 
 add_executable(moria
   ${EMBED_OUT}
@@ -109,18 +110,17 @@ target_compile_definitions(moria PRIVATE MORIA_VERSION="${PROJECT_VERSION}")
 find_package(Threads REQUIRED)
 target_link_libraries(moria PRIVATE Threads::Threads)
 
-# Decompression codecs for --extract. Each is a leaf dependency behind the single
-# seam in src/extract/decompress.cpp. All four are REQUIRED by default so a build
-# always yields a fully-capable binary and a missing lib fails loudly at configure
-# instead of silently dropping a codec. -DMORIA_OPTIONAL_CODECS=ON relaxes that for
-# a minimal / identify-only build (a missing codec is then just disabled).
-option(MORIA_OPTIONAL_CODECS "Build even if a decompressor is missing (disables that codec)" OFF)
+# Compression libraries used by --extract. All four are required by default so
+# a normal build can unpack every listed compression format. If a library is
+# missing, setup stops with a clear message. -DMORIA_OPTIONAL_CODECS=ON allows a
+# build without that format.
+option(MORIA_OPTIONAL_CODECS "Keep building when a compression library is missing (skips that format)" OFF)
 
 macro(moria_require_codec found_var name pkg)
   if(NOT ${found_var} AND NOT MORIA_OPTIONAL_CODECS)
     message(FATAL_ERROR
       "${name} not found. Install its development package (e.g. ${pkg}), or pass "
-      "-DMORIA_OPTIONAL_CODECS=ON to build without it (disables ${name} decoding).")
+      "-DMORIA_OPTIONAL_CODECS=ON to build without it (cannot unpack ${name}).")
   endif()
 endmacro()
 
@@ -164,7 +164,7 @@ if(ZSTD_FOUND)
   target_compile_definitions(moria PRIVATE MORIA_HAVE_ZSTD)
 endif()
 
-# Component unit tests for the engine primitives.
+# Small checks for the main file-reading parts.
 add_executable(moria_unit
   tests/unit/unit_tests.cpp
   src/expr.cpp

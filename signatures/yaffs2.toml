@@ -12,7 +12,7 @@ hex = "ffff"
 endian = "little"
 
 [doc]
-description = "YAFFS2 flash filesystem (heuristic: first-object header). Little-endian only; no format magic."
+description = "YAFFS2 flash file system. Recognized from its first file record because the format has no fixed starting marker. Little-endian files only."
 references = [
   { title = "YAFFS2 spec", url = "https://yaffs.net/documents/how-yaffs-works" },
 ]

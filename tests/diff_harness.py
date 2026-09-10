@@ -1,26 +1,22 @@
 #!/usr/bin/env python3
-"""Differential identification harness: moria vs file / binwalk / unblob.
+"""Compare moria's file-type results with file, binwalk, and unblob.
 
-Runs each installed tool on every corpus sample, normalizes each tool's
-top-type verdict onto moria's type vocabulary, diffs the verdicts, and emits a
-categorized disagreement report. This is a triage aid, NOT a hard gate: it
-surfaces (a) moria's real misses/mislabels and (b) cases where moria is right
-and an incumbent is wrong.
+The script runs each installed program on every test file, gives equivalent
+type names one shared label, and reports where the programs disagree. This is
+a review aid, not a required check. It shows both moria's missed or incorrect
+labels and cases where moria gives the better answer.
 
-Ground truth: the corpus groups samples into category directories (fs-squashfs,
-uimage, dtb, ...); that directory IS the labeled type. Container categories
-(full-flash) have no single top type, so they are scored for agreement only,
-not correctness.
-
-The report (which echoes corpus filenames) is written to a gitignored output
-dir (default: diff-report/) so nothing from the corpus lands in the tree.
+Test files are grouped in folders named for their expected type, such as
+fs-squashfs, uimage, or dtb. Full-flash files can contain several types, so they
+are checked only for agreement. Reports can include test filenames, so they are
+written to the Git-ignored diff-report/ folder by default.
 
 Usage:
   tests/diff_harness.py [--corpus DIR] [--out DIR] [--per-cat N]
                         [--max-bytes N] [--timeout S] [--workers N]
                         [--categories a,b,c] [--no-binwalk] [--no-file]
 
-Point --corpus at a local firmware corpus (subdirs name the expected type).
+Set --corpus to a local firmware collection whose folders name the expected type.
 """
 import argparse
 import json
@@ -36,9 +32,8 @@ MORIA = os.path.join(HERE, "..", "build", "moria")
 SIGS = os.path.join(HERE, "..", "signatures")
 
 # ---------------------------------------------------------------------------
-# Type vocabulary: canonical families. Every tool's raw verdict is folded to a
-# canonical token so squashfs == squashfs_legacy, ubi == ubifs, fat == fat32,
-# etc. all count as agreement. The canonical token is the family key.
+# Equivalent file-type names used by the different programs. For example,
+# squashfs and squashfs_legacy should count as the same answer.
 # ---------------------------------------------------------------------------
 FAMILY = {
     "squashfs": "squashfs", "squashfs_legacy": "squashfs",
@@ -373,7 +368,7 @@ def run_one(cat, path, tools, timeout, broad=False):
 
 
 def bucket(m, x):
-    """Compare moria (m) vs incumbent (x); both canonical."""
+    """Group one moria answer and one other program's answer."""
     if m == x:
         return "agree"
     if m != "unknown" and x == "unknown":
@@ -383,8 +378,8 @@ def bucket(m, x):
     return "mismatch"
 
 
-def redact(path, corpus):
-    """Path relative to corpus root (still gitignored output, but tidy)."""
+def display_path(path, corpus):
+    """Shorten a path by showing it from the test collection's main folder."""
     try:
         return os.path.relpath(path, corpus)
     except ValueError:
@@ -393,29 +388,35 @@ def redact(path, corpus):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--corpus", default=os.environ.get("MORIA_CORPUS", "corpus"))
-    ap.add_argument("--out", default=os.path.join(HERE, "..", "diff-report"))
+    ap.add_argument("--corpus", default=os.environ.get("MORIA_CORPUS", "corpus"),
+                    help="folder of test files grouped by expected type")
+    ap.add_argument("--out", default=os.path.join(HERE, "..", "diff-report"),
+                    help="folder for the comparison report")
     ap.add_argument("--per-cat", type=int, default=0,
-                    help="cap files per category (0 = all)")
+                    help="maximum files from each group (0 = all)")
     ap.add_argument("--max-bytes", type=int, default=2 * 1024**3,
-                    help="skip samples larger than this (default 2 GiB)")
-    ap.add_argument("--timeout", type=int, default=180)
-    ap.add_argument("--workers", type=int, default=4)
+                    help="skip files larger than this (default 2 GiB)")
+    ap.add_argument("--timeout", type=int, default=180,
+                    help="maximum seconds to wait for each program")
+    ap.add_argument("--workers", type=int, default=4,
+                    help="number of files to check at the same time")
     ap.add_argument("--categories", default="",
-                    help="comma-separated category allowlist")
-    ap.add_argument("--no-binwalk", action="store_true")
-    ap.add_argument("--no-file", action="store_true")
+                    help="comma-separated list of groups to include")
+    ap.add_argument("--no-binwalk", action="store_true",
+                    help="do not compare with binwalk")
+    ap.add_argument("--no-file", action="store_true",
+                    help="do not compare with file")
     ap.add_argument("--broad", action="store_true",
-                    help="pass --broad to moria (load ~2.5k generated general-format sigs)")
+                    help="pass --broad to moria (check about 2,500 more file types)")
     ap.add_argument("--recursive", action="store_true",
-                    help="walk all files under corpus (theme-organized trees like "
-                         "format-corpus); category = top-level subdir, no type GT")
+                    help="check all files under the selected folder; use each top-level "
+                         "folder only to group the report")
     args = ap.parse_args()
 
     if not os.path.exists(MORIA):
         sys.exit(f"moria binary not found at {MORIA} (build it first)")
     if not os.path.isdir(args.corpus):
-        sys.exit(f"corpus dir not found: {args.corpus}")
+        sys.exit(f"test-file folder not found: {args.corpus}")
 
     tools = ["moria"]
     if not args.no_file and shutil.which("file"):
@@ -428,7 +429,7 @@ def main():
     cats = set(c for c in args.categories.split(",") if c) or None
     work = gather_files(args.corpus, cats, args.per_cat, args.max_bytes, args.recursive)
     print(f"tools: {', '.join(tools)}{'  [moria --broad]' if args.broad else ''}")
-    print(f"corpus: {args.corpus}  ({len(work)} samples)")
+    print(f"test files: {args.corpus}  ({len(work)} files)")
     if len(work) == 0:
         sys.exit("no samples to scan")
 
@@ -497,37 +498,36 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     md = []
     W = md.append
-    W("# moria differential identification report\n")
-    W(f"- tools: {', '.join(tools)}")
-    W(f"- corpus: `{args.corpus}`")
-    W(f"- samples: {len(rows)}  (ground-truth-labeled: {len(gt_rows)})")
-    W(f"- max-bytes: {args.max_bytes}  per-cat: {args.per_cat or 'all'}")
-    W("- **top verdict = the type each tool assigns at offset 0** (the whole-file "
-      "identity). Mid-file matches — embedded strings, crc/aes constants, a nested "
-      "blob — are not counted as a verdict; a tool with nothing at offset 0 gave "
-      "no whole-file ID (unknown). Verdicts are folded to canonical families "
+    W("# moria file-type comparison report\n")
+    W(f"- programs: {', '.join(tools)}")
+    W(f"- test-file folder: `{args.corpus}`")
+    W(f"- files: {len(rows)}  (expected type known: {len(gt_rows)})")
+    W(f"- largest file: {args.max_bytes} bytes  files per group: {args.per_cat or 'all'}")
+    W("- **main answer = the type each program finds at starting byte 0.** "
+      "Matches later in the file are not counted as the main answer. A program "
+      "with no match at byte 0 gives an unknown answer. Equivalent type names "
+      "are grouped together "
       "(squashfs==squashfs_legacy, ubi==ubifs, fat==fat32, ext2/3/4==ext, "
-      "dtb==fit, ...) before diffing.\n")
+      "dtb==fit, ...) before comparison.\n")
 
-    W("## Agreement with moria (top verdict, canonical)\n")
-    W("| incumbent | agree | moria-only IDs | tool-only IDs | mismatch |")
+    W("## Agreement with moria's main answer\n")
+    W("| other program | agree | only moria finds a type | only other program finds a type | different types |")
     W("|---|---:|---:|---:|---:|")
     for t in incumbents:
         b = buckets[t]
         W(f"| {t} | {len(b['agree'])} | {len(b['moria_only'])} "
           f"| {len(b['tool_only'])} | {len(b['mismatch'])} |")
     W("")
-    W("- **moria-only IDs**: moria names a type at offset 0 where the incumbent "
-      "says unknown/data.")
-    W("- **tool-only IDs**: the incumbent names a type at offset 0 where moria's "
-      "offset-0 verdict is unknown. This is a *top-verdict* axis: moria may still "
-      "detect the type past offset 0 (see the misses and padded/multi-part "
-      "sections for true non-detection).")
-    W("- **mismatch**: both name a type at offset 0 but they differ.\n")
+    W("- **Only moria finds a type:** moria names the whole file while the other "
+      "program says unknown or data.")
+    W("- **Only the other program finds a type:** the other program names the "
+      "whole file while moria does not. moria may still find that type later in "
+      "the file.")
+    W("- **Different types:** both programs name the whole file, but their answers differ.\n")
 
-    W("## Ground-truth scoreboard (labeled type detected, by category)\n")
-    W("A tool is credited when the labeled type appears anywhere in its findings "
-      "(detection), not only at offset 0 — so a padded image counts.\n")
+    W("## Expected file types found, by group\n")
+    W("A program gets credit when the expected type appears anywhere in its "
+      "results, even if it starts later than byte 0.\n")
     hdr = "| category | n | " + " | ".join(tools) + " |"
     W(hdr)
     W("|---|---:|" + "---:|" * len(tools))
@@ -548,11 +548,8 @@ def main():
     W(f"| **overall** | {totals[tools[0]][1]} | " + " | ".join(tcells) + " |")
     W("")
 
-    # Detection vs `file` as reference oracle. For a corpus with no ground-truth
-    # dirs (format-corpus), `file` is the authoritative general-format labeler;
-    # this answers "what does file identify that moria does not detect anywhere".
-    # Detection-based (not offset-0), so e.g. a PDF whose %PDF- header sits at
-    # offset 1 behind a leading space counts as detected.
+    # Compare every type reported by `file` with moria's matches anywhere in the
+    # same file. This is useful when the test folders do not name expected types.
     if "file" in incumbents:
         by_ftype = defaultdict(lambda: [0, 0, []])  # ftype -> [detected, total, miss_paths]
         for r in rows:
@@ -567,14 +564,14 @@ def main():
                 rec[2].append(r)
         det_tot = sum(v[0] for v in by_ftype.values())
         all_tot = sum(v[1] for v in by_ftype.values())
-        W("## Detection vs `file` (file as reference oracle)\n")
-        W("For every file `file` gives a specific type (plain text excluded — moria "
-          "is a binary/firmware identifier, not a text classifier), does moria detect "
-          "that type anywhere in its findings? Detection-based, so an offset>0 header "
-          "counts.\n")
+        W("## File types found by both moria and `file`\n")
+        W("For each non-text type reported by `file`, this section checks whether "
+          "moria finds the same type anywhere in the file. A match may start after "
+          "byte 0. Plain text is excluded because moria checks binary and firmware "
+          "files.\n")
         if all_tot:
             W(f"- **moria detects {det_tot}/{all_tot} "
-              f"({100*det_tot/all_tot:.1f}%) of file's non-text verdicts.**\n")
+              f"({100*det_tot/all_tot:.1f}%) of the non-text types reported by `file`.**\n")
         W("| file type | n | moria detects | notes |")
         W("|---|---:|---:|---|")
         for ft_ in sorted(by_ftype, key=lambda k: -by_ftype[k][1]):
@@ -582,60 +579,59 @@ def main():
             note = ""
             if det < tot and ft_ in ("epub", "docx", "xlsx", "pptx",
                                      "opendocument", "ooxml"):
-                note = "moria sees the zip container (no per-document sig)"
+                note = "moria finds ZIP but has no separate rule for this document type"
             W(f"| {ft_} | {tot} | {det}/{tot} | {note} |")
         W("")
-        # The genuine gaps: file's non-text types moria detects in 0 cases.
+        # Types reported by `file` that moria never finds.
         gaps = {ft_: v for ft_, v in by_ftype.items() if v[0] == 0}
         if gaps:
-            W("### moria detects none of these `file` types (candidate sig gaps)\n")
+            W("### File types that may need new moria recognition rules\n")
             for ft_ in sorted(gaps, key=lambda k: -gaps[k][1]):
-                paths = [redact(r["path"], args.corpus) for r in gaps[ft_][2][:3]]
+                paths = [display_path(r["path"], args.corpus) for r in gaps[ft_][2][:3]]
                 W(f"- **{ft_}** ({gaps[ft_][1]}): e.g. " +
                   ", ".join(f"`{p}`" for p in paths))
             W("")
 
-    W(f"## moria misses ({len(misses)}) — real gaps/mislabels, prioritized\n")
-    W("moria does not detect the labeled type at all. `correct incumbents` are "
-      "the reference to chase (none => the corpus label itself is suspect).\n")
+    W(f"## Expected types moria misses ({len(misses)})\n")
+    W("moria does not find the expected type in these files. `Other programs "
+      "that find it` shows which comparison programs agree with the expected label.\n")
     misses.sort(key=lambda r: r["cat"])
     for r in misses:
         right = [t for t, ok in r["_inc_ok"].items() if ok]
-        W(f"- `{redact(r['path'], args.corpus)}` gt=**{r['gt']}** "
+        W(f"- `{display_path(r['path'], args.corpus)}` expected=**{r['gt']}** "
           f"moria=**{r['moria']}** ({r.get('moria_raw')}) "
-          f"| correct incumbents: {', '.join(right) or 'none'}")
+          f"| other programs that find it: {', '.join(right) or 'none'}")
     if not misses:
         W("_none._")
     W("")
 
-    W(f"## moria detects but does not lead with ({len(not_top)}) — padded/multi-part\n")
-    W("moria found the labeled type past offset 0 (leading header, NVRAM prefix, "
-      "or a multi-part MTD block); the offset-0 top verdict is something else. "
-      "Not a miss — often moria is more precise about where the fs starts.\n")
+    W(f"## Expected type found later in the file ({len(not_top)})\n")
+    W("moria found the expected type after byte 0, so it gave a different type as "
+      "the main answer for the whole file. This often happens when a file system "
+      "starts after a device header or when one file contains several parts.\n")
     not_top.sort(key=lambda r: r["cat"])
     for r in not_top:
-        W(f"- `{redact(r['path'], args.corpus)}` gt=**{r['gt']}** detected; "
-          f"top verdict={r['moria']} ({r.get('moria_raw')})")
+        W(f"- `{display_path(r['path'], args.corpus)}` expected=**{r['gt']}** found; "
+          f"main answer={r['moria']} ({r.get('moria_raw')})")
     if not_top:
         pass
     else:
         W("_none._")
     W("")
 
-    W(f"## moria wins ({len(wins)}) — moria right, an incumbent wrong\n")
-    W("The credibility story: moria's precise verdict beats an incumbent.\n")
+    W(f"## Expected types moria finds and another program misses ({len(wins)})\n")
     wins.sort(key=lambda r: r["cat"])
     for r in wins:
         det = []
         for t in r["_inc_wrong"]:
             det.append(f"{t}={r[t]} ({r.get(t+'_raw')})")
-        W(f"- `{redact(r['path'], args.corpus)}` gt=**{r['gt']}** "
-          f"moria correct | wrong: {'; '.join(det)}")
+        W(f"- `{display_path(r['path'], args.corpus)}` expected=**{r['gt']}** "
+          f"moria finds the expected type | other results: {'; '.join(det)}")
     if not wins:
         W("_none._")
     W("")
 
-    # Unresolved mismatches without ground truth (container/full-flash etc.)
+    # Different answers for files whose expected type is not known.
     nogt_mismatch = []
     for r in rows:
         if r["gt"] not in (None, "unknown"):
@@ -643,11 +639,11 @@ def main():
         for t in incumbents:
             if bucket(r["moria"], r[t]) == "mismatch":
                 nogt_mismatch.append((r, t))
-    W(f"## Unlabeled mismatches ({len(nogt_mismatch)}) — no ground truth\n")
-    W("Container/unlabeled samples where moria and an incumbent name different "
-      "top types (expected for multi-format images; skim for surprises).\n")
+    W(f"## Different answers for files without an expected type ({len(nogt_mismatch)})\n")
+    W("moria and another program gave different main answers for these files. "
+      "This is common when one firmware file contains several formats.\n")
     for r, t in nogt_mismatch[:60]:
-        W(f"- `{redact(r['path'], args.corpus)}` moria={r['moria']} "
+        W(f"- `{display_path(r['path'], args.corpus)}` moria={r['moria']} "
           f"vs {t}={r[t]}")
     if len(nogt_mismatch) > 60:
         W(f"- ... and {len(nogt_mismatch)-60} more (see JSON)")
@@ -656,7 +652,7 @@ def main():
     W("")
 
     if any(unmapped.values()):
-        W("## Unmapped incumbent verdicts (extend the normalizer)\n")
+        W("## Answers that are not yet grouped under a shared file-type name\n")
         for t, toks in unmapped.items():
             if toks:
                 W(f"- **{t}**: " + ", ".join(f"`{x}`" for x in sorted(toks)))
@@ -672,17 +668,18 @@ def main():
 
     # ------------------------------------------------------------ terminal tail
     print("\n" + "\n".join(md[:2]))
-    print("\nagreement vs moria:")
+    print("\nagreement with moria:")
     for t in incumbents:
         b = buckets[t]
         print(f"  {t:<8} agree={len(b['agree'])} moria_only={len(b['moria_only'])} "
               f"tool_only={len(b['tool_only'])} mismatch={len(b['mismatch'])}")
-    print("\nground-truth detection accuracy:")
+    print("\nexpected file types found:")
     for t in tools:
         hit, tot = totals[t]
         print(f"  {t:<8} {100*hit/tot:.1f}%  ({hit}/{tot})" if tot else f"  {t}: --")
-    print(f"\nmoria misses: {len(misses)}   moria wins: {len(wins)}   "
-          f"detected-not-top: {len(not_top)}")
+    print(f"\nexpected types moria misses: {len(misses)}   "
+          f"types another program misses: {len(wins)}   "
+          f"expected type found later: {len(not_top)}")
     print(f"\nreport: {report_md}\n        {report_json}")
     return 0
 

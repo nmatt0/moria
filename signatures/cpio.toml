@@ -18,7 +18,7 @@ ascii = "070707"
 endian = "little"
 
 [doc]
-description = "cpio archive (newc/crc/odc), often the payload of an initramfs."
+description = "cpio archive, often used to hold files needed while Linux starts."
 references = [
   { title = "cpio format (Linux initramfs)", url = "https://www.kernel.org/doc/html/latest/driver-api/early-userspace/buffer-format.html" },
 ]

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""Accuracy harness: score moria findings against the firmware corpus.
+"""Check moria's results against a labeled collection of firmware files.
 
-the corpus groups samples into category directories (fs-squashfs, uimage, dtb, ...);
-that directory IS the ground-truth type. For each category with a known expected
-type, we run moria on every file and check whether the expected type appears
-among the findings. Reports per-category detection rate and, for misses, what
-the tool labeled the file instead (so labeling discrepancies and real gaps are
-both visible). Categories we have no signature for yet are listed, not scored.
+Each folder groups examples of one type, such as fs-squashfs, uimage, or dtb.
+The folder name is the expected type. The check runs moria on each file and
+looks for that type in the results. It reports the success rate for each folder
+and shows what moria reported for missed examples. File types without a
+recognition rule are listed but not scored.
 
 Usage: tests/accuracy.py [corpus_samples_dir]
-Exit status is nonzero if any scored category falls below --min (default 0.90).
+The command fails if any scored group falls below 90 percent.
 """
 import json
 import os
@@ -31,13 +30,13 @@ EXPECT = {
     "uimage": {"uimage"},
     "android-boot": {"android_boot"},
     "android-sparse": {"android_sparse"},
-    "dtb": {"dtb", "fit"},  # the corpus mixes plain DTBs and U-Boot FITs
+    "dtb": {"dtb", "fit"},  # This collection mixes plain DTBs and U-Boot FITs.
     "mcu-elf": {"elf"},
     "mcu-hex": {"ihex"},
     "fs-yaffs": {"yaffs2"},
     "bootloader-rpi": {"rpi_eeprom"},
 }
-# present in the corpus but no signature yet -> listed, not scored
+# Types in the collection that do not have recognition rules yet.
 NOSIG = set()
 # scored as "contains at least one notable finding" rather than a fixed type
 NOTABLE_ONLY = {"full-flash"}

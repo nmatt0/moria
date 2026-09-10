@@ -12,7 +12,7 @@ ascii = "U-Boot 1."
 endian = "little"
 
 [doc]
-description = "Das U-Boot bootloader (version banner present)."
+description = "Das U-Boot startup program with version text present."
 references = [
   { title = "Das U-Boot", url = "https://docs.u-boot.org/" },
 ]

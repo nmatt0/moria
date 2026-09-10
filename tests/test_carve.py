@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Carve-mode (`-c`) regression. Carve dumps each finding's raw byte range (and
-the unidentified gaps) to disk WITHOUT parsing, so the one guarantee that must
-hold is fidelity: every carved blob is byte-identical to that range of the input.
+"""Check that `-c` copies the correct byte sections without changing them.
 
-Self-contained (no external tools): builds a synthetic image out of gzip streams
-and padding, carves it, and checks each blob against the source bytes plus the
-CLI contract (default vs -A gap carving, dir refusal, -e/-c coexistence).
+This check needs no outside programs. It makes an example from gzip-compressed
+data and unused space, copies its sections, and compares each output file with
+the source bytes. It also checks the normal and `-A` behavior, folder errors,
+and using `-e` and `-c` together.
 
 Run: python3 tests/test_carve.py
 """
@@ -38,10 +37,10 @@ def build_image(path):
     parts.append(b"\x00" * 4096)                     # interior padding
     parts.append(gzip.compress(bytes(range(256)) * 32))
     parts.append(b"\x11\x22\x33" * 100)              # 300 B trailing gap
-    blob = b"".join(parts)
+    source_bytes = b"".join(parts)
     with open(path, "wb") as f:
-        f.write(blob)
-    return blob
+        f.write(source_bytes)
+    return source_bytes
 
 
 def run(args):
@@ -52,11 +51,11 @@ def main():
     if not os.path.exists(MORIA):
         print("moria binary not built; run cmake --build build")
         return 1
-    print("test_carve: carve-mode fidelity + CLI contract")
+    print("test_carve: exact byte copying and command behavior")
 
     with tempfile.TemporaryDirectory() as td:
         img = os.path.join(td, "img.bin")
-        blob = build_image(img)
+        source_bytes = build_image(img)
 
         # --- default carve ---
         r = run(["-c", img])
@@ -70,14 +69,15 @@ def main():
         check(man["source"] == img, "manifest source is the input path")
         check(len(man["carved"]) >= 2, "carves at least the 2 gzip findings")
 
-        # THE guarantee: every carved blob == the source's byte range.
-        fidelity = True
+        # Every copied file must exactly match the same bytes in the source.
+        exact_copy = True
         for e in man["carved"]:
             data = open(os.path.join(cdir, e["file"]), "rb").read()
-            if len(data) != e["size"] or data != blob[e["offset"]:e["offset"] + e["size"]]:
-                fidelity = False
+            if (len(data) != e["size"] or
+                    data != source_bytes[e["offset"]:e["offset"] + e["size"]]):
+                exact_copy = False
                 print(f"      mismatch: {e['file']} off={e['offset']} size={e['size']}")
-        check(fidelity, "every carved blob is byte-identical to its input range")
+        check(exact_copy, "every copied file exactly matches its source bytes")
 
         # A gzip finding must be among what got carved.
         check(any(e["type"] == "gzip" for e in man["carved"]), "gzip findings carved by type name")

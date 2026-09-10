@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Deterministic regression test: build synthetic samples, run moria, assert
-each is identified as the expected type at or above the expected confidence.
-Negatives (type None) must produce no finding of a known firmware/format type.
+"""Create made-up sample files and check that moria gives the expected results.
 
-Exit status is nonzero on any failure. No external corpus required.
+Each positive sample must be recognized as the expected type with at least the
+expected confidence score. Negative samples must not be reported as any known
+firmware or file type. The command fails if any check fails. No outside test
+files are required.
 """
 import json
 import os
@@ -24,11 +25,10 @@ def run(path):
 
 
 def coverage_gate():
-    """Every core signature (signatures/*.toml) must have a synthetic fixture,
-    else be explicitly waived. Keeps the suite honest as signatures grow."""
+    """Require a made-up example for every main rule unless it is exempted."""
     import glob
     import re
-    waived = set()  # none currently — all core sigs have fixtures
+    waived = set()  # Every main rule currently has an example.
     sig_names = set()
     for p in glob.glob(os.path.join(HERE, "..", "signatures", "*.toml")):
         m = re.search(r'(?m)^name\s*=\s*"([^"]+)"', open(p).read())
@@ -37,13 +37,12 @@ def coverage_gate():
     covered = {t for _, _, t, _ in gen_samples.MANIFEST if t}
     missing = sig_names - covered - waived
     if missing:
-        print(f"  COVERAGE GAP: core signatures with no fixture: {sorted(missing)}")
+        print(f"  MISSING EXAMPLES: main rules with no sample file: {sorted(missing)}")
     return not missing
 
 
 def sig_load_sanity():
-    """All signature sets (core + firmware + generated via --broad) must load
-    with zero warnings — a malformed .toml otherwise only surfaces at runtime."""
+    """Require every rule set to load without warnings."""
     import tempfile
     with tempfile.NamedTemporaryFile(suffix=".txt") as tf:
         tf.write(b"hello\n")
@@ -51,7 +50,7 @@ def sig_load_sanity():
         r = subprocess.run([BIN, "-j", "--broad", tf.name], capture_output=True, timeout=60)
     warns = [ln for ln in r.stderr.decode(errors="replace").splitlines() if "warning" in ln.lower()]
     if warns:
-        print(f"  SIGNATURE LOAD WARNINGS ({len(warns)}):")
+        print(f"  FILE-RECOGNITION RULE WARNINGS ({len(warns)}):")
         for w in warns[:5]:
             print(f"    {w}")
     return not warns
@@ -106,7 +105,7 @@ def main():
             doc = run(path)
             findings = doc["findings"]
             if expect_type is None:
-                # Negative: no finding should claim a real format for this blob.
+                # A negative sample must not be labeled as a known file type.
                 got = [f["type"] for f in findings]
                 status = "ok" if not got else f"UNEXPECTED {got}"
                 if got:
@@ -131,16 +130,16 @@ def main():
     if fails or not cov_ok or not load_ok or not list_ok:
         extra = []
         if not cov_ok:
-            extra.append("coverage gap")
+            extra.append("missing sample files")
         if not load_ok:
-            extra.append("sig-load warnings")
+            extra.append("file-recognition rule warnings")
         if not list_ok:
             extra.append("--list broken")
         print(f"FAIL: {len(fails)}/{len(gen_samples.MANIFEST)} samples"
               f"{(' + ' + ', '.join(extra)) if extra else ''}")
         return 1
-    print(f"PASS: all {len(gen_samples.MANIFEST)} samples; every core signature has a fixture; "
-          f"all signature sets load clean")
+    print(f"PASS: all {len(gen_samples.MANIFEST)} samples; every main rule has an example; "
+          f"all file-recognition rules load without warnings")
     return 0
 
 

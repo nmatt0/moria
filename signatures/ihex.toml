@@ -11,7 +11,7 @@ ascii = ":"
 endian = "little"
 
 [doc]
-description = "Intel HEX firmware image (ASCII records, common for MCU flashing)."
+description = "Intel HEX firmware in plain-text records, often used to install software on microcontrollers."
 references = [
   { title = "Intel HEX format", url = "https://en.wikipedia.org/wiki/Intel_HEX" },
 ]

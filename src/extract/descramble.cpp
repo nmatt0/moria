@@ -26,8 +26,9 @@ bool extract_descramble(const Reader& r, const Finding& f, SafeRoot& root,
         out.files++;
         out.bytes += res->data.size();
         out.consumed = res->total_span;  // let the driver claim header+ciphertext
-        out.warnings.push_back("descrambled: " + res->scheme + " (" + res->cipher +
-                               ", key=" + res->key_desc + ", validated=" + res->validated + ")");
+        out.warnings.push_back("restored scrambled data with " + res->scheme + " (" + res->cipher +
+                               "; key: " + res->key_desc + "; restored file type: " +
+                               res->validated + ")");
         out.status = "ok";
     } else {
         out.status = "error:write";

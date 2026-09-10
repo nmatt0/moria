@@ -32,7 +32,7 @@ hex = "5f42485266535f4d"
 endian = "little"
 
 [doc]
-description = "btrfs filesystem (Linux copy-on-write B-tree filesystem, NAS/appliance and desktop images)."
+description = "btrfs file system used by Linux computers, storage servers, and other devices."
 references = [
   { title = "btrfs on-disk format", url = "https://btrfs.readthedocs.io/en/latest/dev/On-disk-format.html" },
 ]

@@ -24,7 +24,7 @@ ascii = "UBI!"
 endian = "big"
 
 [doc]
-description = "UBI (Unsorted Block Images) volume on raw NAND flash."
+description = "A UBI (Unsorted Block Images) storage volume on NAND flash memory."
 references = [
   { title = "UBI documentation", url = "http://www.linux-mtd.infradead.org/doc/ubi.html" },
 ]

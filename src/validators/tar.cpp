@@ -77,7 +77,7 @@ bool validate_tar(ValidatorCtx& ctx) {
     if (members == 0) return false;  // no valid header -> reject (stray "ustar")
     size_t span = (pos <= limit ? pos : limit) - base;
     if (span > ctx.out.size) ctx.out.size = span;
-    ctx.out.set_confidence(Confidence::Consistent, "tar members walked, size computed");
+    ctx.out.set_confidence(Confidence::Consistent, "tar file list and total size checked");
     return true;
 }
 

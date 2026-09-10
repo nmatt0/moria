@@ -34,7 +34,7 @@ constraints = [
 soft_constraints = [
   "s_log_block_size <= 6",
 ]
-soft_evidence = "ext superblock present; s_log_block_size out of range (corrupt/tampered)"
+soft_evidence = "ext file-system header found, but its block size is outside the expected range; the file may be damaged or changed"
 
 # block size = 1024 << s_log_block_size; total size = blocks * block size. A
 # dump can be smaller than the recorded device size, so clamp rather than reject.

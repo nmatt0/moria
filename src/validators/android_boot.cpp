@@ -56,7 +56,7 @@ bool validate_android_boot(ValidatorCtx& ctx) {
     if (end > ctx.out.size) ctx.out.size = static_cast<size_t>(end);
     // Whole declared layout present in-file -> the structure is internally
     // consistent, not just a magic + a plausible size field.
-    ctx.out.set_confidence(Confidence::Consistent, "boot image layout fits in file");
+    ctx.out.set_confidence(Confidence::Consistent, "declared boot image layout fits in the file");
     return true;
 }
 

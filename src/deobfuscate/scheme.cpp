@@ -164,8 +164,8 @@ std::optional<DescrambleResult> encrpted_img(const Reader& r, size_t off, bool p
 }
 
 // Does a decrypted buffer start with a recognizable firmware/container magic?
-// Returns the type name (for provenance/validation) or "" if none. Used to
-// confirm a trial decryption produced real firmware, not garbage.
+// Returns the type name, or "" when nothing matches. This confirms that a trial
+// decryption produced recognizable firmware instead of meaningless data.
 const char* firmware_magic(std::span<const uint8_t> p) {
     auto at = [&](size_t o, const char* m, size_t n) {
         return p.size() >= o + n && std::memcmp(p.data() + o, m, n) == 0;

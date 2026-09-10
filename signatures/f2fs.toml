@@ -30,7 +30,7 @@ hex = "1020f5f2"
 endian = "little"
 
 [doc]
-description = "F2FS (Flash-Friendly File System), common on Android userdata and flash storage."
+description = "F2FS (Flash-Friendly File System), often used for Android user data and flash storage."
 references = [
   { title = "F2FS on-disk layout", url = "https://docs.kernel.org/filesystems/f2fs.html" },
 ]

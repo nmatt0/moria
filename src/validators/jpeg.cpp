@@ -34,7 +34,8 @@ bool validate_jpeg(ValidatorCtx& ctx) {
         }
         if (marker == 0xD9) {  // EOI
             ctx.out.size = (m + 1) - base;
-            ctx.out.set_confidence(Confidence::Consistent, "JPEG SOI..EOI walked, size computed");
+            ctx.out.set_confidence(Confidence::Consistent,
+                                   "JPEG start and end found and size checked");
             return true;
         }
         // SOI/RST as the next marker is invalid inside a well-formed stream.

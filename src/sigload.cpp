@@ -112,7 +112,7 @@ Signature load_one(const toml::table& tbl) {
         }
     }
     sig.soft_evidence = tbl["soft_evidence"].value_or(
-        std::string("magic + core fields present; a header field is out of range"));
+        std::string("identifying bytes found, but one header value is outside the expected range"));
 
     // size expression
     if (auto s = tbl["size"].value<std::string>()) {
@@ -186,7 +186,7 @@ LoadResult load_signatures(const std::string& dir) {
     LoadResult result;
     std::error_code ec;
     if (!fs::is_directory(dir, ec)) {
-        result.errors.push_back("signature directory not found: " + dir);
+        result.errors.push_back("file-recognition rule folder not found: " + dir);
         return result;
     }
 

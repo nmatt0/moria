@@ -1,12 +1,11 @@
 // lzo1x.hpp — internal, bounds-checked LZO1X decompressor (decompress only).
 //
 // jffs2 and ubifs store data nodes compressed with the raw LZO1X-1 bitstream
-// (the kernel calls lzo1x_decompress_safe on it). liblzo2 is GPL-2.0, which
-// would relicense moria, so this is a clean-room MIT reimplementation of the
-// public LZO1X decompression algorithm — no third-party code. The uncompressed
-// size is always known from the node header, so decompression is bounded to a
-// caller-supplied output capacity and every input/output access is range-checked
-// (LZO decoders are a classic overflow source; see CVE-2014-4607).
+// (the kernel calls lzo1x_decompress_safe on it). liblzo2 uses GPL-2.0, so moria
+// uses its own MIT-licensed implementation of the published LZO1X decompression
+// method. No code was copied from liblzo2. The record header gives the final
+// size, so the caller limits the output and every read and write is checked
+// (see CVE-2014-4607 for why these checks matter).
 #pragma once
 
 #include <cstddef>

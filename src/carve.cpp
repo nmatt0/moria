@@ -99,7 +99,8 @@ CarveResult carve(const std::string& src_path, const Reader& reader,
 
     SafeRoot root;
     if (!root.open(outdir)) {
-        std::fprintf(stderr, "error: cannot create carve dir: %s\n", outdir.c_str());
+        std::fprintf(stderr, "error: cannot create folder for copied byte sections: %s\n",
+                     outdir.c_str());
         return res;
     }
     res.outdir = root.path();

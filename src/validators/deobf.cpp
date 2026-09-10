@@ -11,9 +11,10 @@ bool validate_deobf(ValidatorCtx& ctx) {
     if (p->total_span > ctx.out.size) ctx.out.size = p->total_span;
     if (p->validated)
         ctx.out.set_confidence(Confidence::Verified,
-                               "encrypted; decryptable (" + p->cipher + ") - -e to recover");
+                               "encrypted; can be restored with " + p->cipher +
+                                   "; use -e to recover it");
     else
-        ctx.out.set_confidence(Confidence::Structural, "encrypted; no working key");
+        ctx.out.set_confidence(Confidence::Structural, "encrypted; no working key found");
     return true;
 }
 

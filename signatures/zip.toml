@@ -16,5 +16,5 @@ hex = "504b0304"
 endian = "little"
 
 [doc]
-description = "ZIP archive (or ZIP-based: docx/xlsx/epub/jar/apk)."
+description = "ZIP archive; may also be a DOCX, XLSX, EPUB, JAR, or APK file."
 references = [ { title = "ZIP APPNOTE", url = "https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT" } ]

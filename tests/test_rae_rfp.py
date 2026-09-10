@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""RAE Systems / Honeywell RFP extraction regression.
+"""Check that RAE Systems / Honeywell RFP sections unpack correctly.
 
-Builds a synthetic RFP with a stored section and a real LZARI-compressed section
-(a genuine compressed RFP section captured from firmware, with its known plaintext),
-runs `moria -e`, and asserts every section round-trips: stored copied verbatim,
-LZARI decoded byte-for-byte. Self-contained; no external tools. Exit nonzero on
-any failure.
+The check builds an RFP file with an unchanged section and a real
+LZARI-compressed section taken from firmware. It runs `moria -e` and compares
+each result with the original bytes. It needs no outside programs and fails if
+any bytes differ.
 """
 import base64
 import json

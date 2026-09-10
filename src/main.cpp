@@ -113,33 +113,33 @@ const char* basename_of(const char* argv0) {
 void print_help(std::FILE* out, const char* prog, bool color) {
     const char* B = color ? "\033[1m" : "";  // bold section headers on a tty
     const char* R = color ? "\033[0m" : "";
-    std::fprintf(out, "Identify and unpack embedded file types in firmware images.\n\n");
+    std::fprintf(out, "Find and unpack files stored inside firmware.\n\n");
     std::fprintf(out, "%sUSAGE%s\n", B, R);
     std::fprintf(out, "  %s [options] <file|dir>\n\n", prog);
     std::fprintf(out, "%sOPTIONS%s\n", B, R);
     std::fprintf(out,
-                 "  -j, --json          JSON output (default: human-readable)\n"
-                 "  -e, --extract       Extract filesystems and containers to <file>.extracted/\n"
-                 "  -c, --carve         Carve raw byte ranges to <file>.carved/, no parsing\n"
-                 "  -A, --all           Show findings inside containers/filesystems (default: hidden)\n"
-                 "  -E, --entropy       Entropy analysis: unidentified regions + encryption hints\n"
-                 "      --broad         Also match ~2500 general (non-firmware) formats\n"
-                 "      --list          List archive contents without extracting\n"
-                 "  -C, --outdir <DIR>  Output directory for -e / -c\n"
-                 "      --depth <N>     Max extraction recursion depth (default: 8)\n"
-                 "      --max-files <N> Stop extraction after N files (default: 500000)\n"
-                 "      --max-bytes <N> Stop extraction after N bytes (default: 4 GiB)\n"
-                 "      --sigs <DIR>    Load signatures from DIR\n"
-                 "      --threads <N>   Worker threads for directory scans\n"
-                 "  -h, --help          Print help\n"
-                 "      --version       Print version\n\n");
+                 "  -j, --json          Return JSON (default: easy-to-read text)\n"
+                 "  -e, --extract       Unpack supported files to <file>.extracted/\n"
+                 "  -c, --carve         Copy exact byte sections to <file>.carved/\n"
+                 "  -A, --all           Show matches found inside other files\n"
+                 "  -E, --entropy       Measure randomness and flag unknown, possibly encrypted areas\n"
+                 "      --broad         Check about 2,500 more general file types\n"
+                 "      --list          List files inside an archive without unpacking\n"
+                 "  -C, --outdir <DIR>  Where -e or -c writes files\n"
+                 "      --depth <N>     File-within-a-file levels to unpack (default: 8)\n"
+                 "      --max-files <N> Stop after writing N files (default: 500000)\n"
+                 "      --max-bytes <N> Stop after writing N bytes (default: 4 GiB)\n"
+                 "      --sigs <DIR>    Use file-recognition rules from DIR\n"
+                 "      --threads <N>   Number of files to check at once\n"
+                 "  -h, --help          Show this help\n"
+                 "      --version       Show the version\n\n");
     std::fprintf(out, "%sEXAMPLES%s\n", B, R);
     std::fprintf(out,
-                 "  %s firmware.bin       Identify a file\n"
-                 "  %s -e firmware.bin    Extract its filesystems\n"
-                 "  %s ./rootfs/          Scan a directory tree\n\n",
+                 "  %s firmware.bin       Show what a file contains\n"
+                 "  %s -e firmware.bin    Unpack its supported file systems\n"
+                 "  %s ./rootfs/          Check every file in a folder\n\n",
                  prog, prog, prog);
-    std::fprintf(out, "Docs: skills/moria/README.md\n");
+    std::fprintf(out, "Full guide: README.md\n");
 }
 
 // Recursion budget + guard rails. Extraction is on hostile input, so runaway
@@ -311,12 +311,14 @@ void extract_findings(ft::Reader& reader, const std::vector<ft::Finding>& findin
         const bool ratio_bomb =
             e.bytes > RATIO_FLOOR && f.size > 0 && e.bytes / f.size > RATIO_LIMIT;
         if (ratio_bomb) {
-            e.warnings.push_back("ratio-capped: output/input > " + std::to_string(RATIO_LIMIT));
+            e.warnings.push_back("stopped unpacking because output is more than " +
+                                 std::to_string(RATIO_LIMIT) + " times the input size");
             // Name the offending entry so a run-level `capped: ratio` is actionable:
             // it means recursion into THIS finding was stopped, not that the whole
             // extraction (which may have recovered everything else) was truncated.
-            char loc[80];
-            std::snprintf(loc, sizeof(loc), "ratio at %s@0x%llx", f.type.c_str(),
+            char loc[128];
+            std::snprintf(loc, sizeof(loc), "expanded output from %s starting at byte 0x%llx",
+                          f.type.c_str(),
                           static_cast<unsigned long long>(f.offset));
             mark_capped(c, loc);
         }
@@ -359,7 +361,7 @@ std::string run_extraction(const std::string& src_path, ft::Reader& reader,
 
     ft::SafeRoot root;
     if (!root.open(outdir)) {
-        std::fprintf(stderr, "error: cannot create output dir: %s\n", outdir.c_str());
+        std::fprintf(stderr, "error: cannot create output folder: %s\n", outdir.c_str());
         return "";
     }
     RecurCtx c{root, sigs, manifest, max_depth, max_files, max_bytes, all};
@@ -489,9 +491,9 @@ int main(int argc, char** argv) {
         if (broad) append(ft::load_signatures_from_memory(ft::embedded_generated()));
     }
     for (const auto& err : sigs.errors)
-        std::fprintf(stderr, "signature load warning: %s\n", err.c_str());
+        std::fprintf(stderr, "file-recognition rule warning: %s\n", err.c_str());
     if (sigs.signatures.empty()) {
-        std::fprintf(stderr, "error: no signatures loaded\n");
+        std::fprintf(stderr, "error: no file-recognition rules loaded\n");
         return 1;
     }
 
@@ -540,8 +542,8 @@ int main(int argc, char** argv) {
                 std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count();
             char buf[512];
             std::snprintf(buf, sizeof(buf),
-                          "Files analyzed:  %zu\nBytes analyzed:  %.*f %s\nFindings:        %zu\n"
-                          "Elapsed:         %.3f s\n",
+                          "Files checked:   %zu\nData checked:    %.*f %s\nMatches:         %zu\n"
+                          "Time:            %.3f s\n",
                           tr.file_count, (std::strcmp(bu, "B") == 0 ? 0 : 1), b, bu,
                           tr.finding_count, secs);
             std::printf("%s", ft::emit_tree_human(tr, buf, out_color, show_all).c_str());
@@ -581,7 +583,7 @@ int main(int argc, char** argv) {
     std::string assessment = ft::assess_file(findings, fm.size(), regions, ent, entropy);
     if (hidden_interior > 0)
         assessment += " (" + std::to_string(hidden_interior) +
-                      " interior findings hidden; -A to show)";
+                      " matches inside other files hidden; -A to show)";
     std::string extraction;
     std::string outdir;
     if (extract) {
@@ -618,24 +620,25 @@ int main(int argc, char** argv) {
         double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count();
         char buf[512];
         std::string footer;
-        if (!extraction.empty()) footer += "-> extracted to " + outdir + "/\n";
+        if (!extraction.empty()) footer += "-> unpacked to " + outdir + "/\n";
         if (carve && cr.regions_written > 0) {
-            footer += "-> carved " + std::to_string(cr.regions_written) +
-                      (cr.regions_written == 1 ? " region (" : " regions (") +
+            footer += "-> copied " + std::to_string(cr.regions_written) +
+                      (cr.regions_written == 1 ? " section (" : " sections (") +
                       human_bytes(cr.bytes_written) + ") to " + cr.outdir + "/";
             if (cr.skipped_unknown > 0)
-                footer += "; " + std::to_string(cr.skipped_unknown) + " unknown-size skipped";
-            if (cr.capped) footer += "; capped at --max-bytes";
+                footer += "; skipped " + std::to_string(cr.skipped_unknown) +
+                          " with unknown sizes";
+            if (cr.capped) footer += "; stopped at --max-bytes";
             footer += "\n";
         } else if (carve) {
-            footer += "-> nothing to carve\n";
+            footer += "-> no byte sections to copy\n";
         }
         if (hidden_interior > 0)
             footer += std::to_string(hidden_interior) +
-                      " interior findings hidden (-A to show)\n";
+                      " matches inside other files hidden (-A to show)\n";
         std::snprintf(buf, sizeof(buf),
-                      "Files analyzed:  1\nBytes analyzed:  %.*f %s\nFindings:        %zu\n"
-                      "Elapsed:         %.3f s\n",
+                      "Files checked:   1\nData checked:    %.*f %s\nMatches:         %zu\n"
+                      "Time:            %.3f s\n",
                       (std::strcmp(bu, "B") == 0 ? 0 : 1), b, bu, nfind, secs);
         footer += buf;
         std::printf("%s", ft::emit_file_human(findings, regions, footer, out_color, show_all).c_str());

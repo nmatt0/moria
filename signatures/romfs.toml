@@ -21,7 +21,7 @@ ascii = "-rom1fs-"
 endian = "big"
 
 [doc]
-description = "romfs (small read-only filesystem)."
+description = "romfs, a small file system that cannot be changed."
 references = [
   { title = "romfs format", url = "https://www.kernel.org/doc/html/latest/filesystems/romfs.html" },
 ]

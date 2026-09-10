@@ -25,7 +25,7 @@ hex = "02214c18"
 endian = "little"
 
 [doc]
-description = "LZ4 legacy-frame compressed data (Android ramdisks and similar)."
+description = "Data compressed in the older LZ4 file format, often used in Android startup files."
 references = [
   { title = "LZ4 Frame Format (Legacy frame appendix)", url = "https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md" },
 ]

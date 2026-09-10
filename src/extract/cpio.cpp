@@ -139,7 +139,7 @@ bool extract_cpio(const Reader& r, const Finding& f, SafeRoot& root, const std::
 
     if (!saw_trailer) {
         truncated = true;
-        out.warnings.push_back("no TRAILER!!! reached; archive may be truncated");
+        out.warnings.push_back("end marker not found; archive may be incomplete");
     }
     out.status = truncated ? "partial" : "ok";
     return true;

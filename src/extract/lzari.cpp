@@ -1,4 +1,4 @@
-// lzari.cpp — LZARI decompressor. See lzari.hpp for provenance.
+// lzari.cpp — LZARI decompressor. See lzari.hpp for source details.
 //
 // A faithful port of the recovered decode path (StartDecode, DecodeChar,
 // DecodePosition, StartModel, UpdateModel, the two binary searches, GetBit).

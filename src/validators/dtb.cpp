@@ -18,7 +18,7 @@ bool validate_dtb(ValidatorCtx& ctx) {
     if (fdt_is_fit(ctx.reader, ctx.offset, &span)) {
         ctx.out.type = "fit";
         ctx.out.category = "container";
-        ctx.out.set_confidence(Confidence::Consistent, "FIT: root /images node present");
+        ctx.out.set_confidence(Confidence::Consistent, "FIT contains the required /images section");
         // Claim the appended external-data payloads too (the FDT totalsize covers
         // only the tree), so inner subimages aren't reported as separate findings.
         if (span > ctx.out.size && ctx.offset + span <= ctx.reader.size()) ctx.out.size = span;

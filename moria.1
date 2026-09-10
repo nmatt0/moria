@@ -1,153 +1,155 @@
-.TH MORIA 1 "2026-08-17" "moria 0.1.0" "User Commands"
+.TH MORIA 1 "2026-09-10" "moria 0.1.0" "User Commands"
 .SH NAME
-moria \- identify files and embedded firmware structures
+moria \- find and unpack files stored inside firmware
 .SH SYNOPSIS
 .B moria
 .RI [ options ]
 .I <file|dir>
 .SH DESCRIPTION
 .B moria
-maps what a file is and what known structures live inside it, with confidence
-scores and sourced metadata. It is identification only: it locates and names
-embedded formats (filesystems, containers, bootloaders, executables,
-compression, media) with byte offsets and confidence tiers. It is
-identification-first; with
+finds known file types stored inside firmware and other device-software files.
+This includes file systems, packaged files, startup programs, programs,
+compressed data, and media. For each match, it shows the starting byte and how
+strongly the file contents support the match. With
 .B \-\-extract
-it also unpacks SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS, romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, HFS+, XFS, btrfs, EROFS, and ISO9660 filesystems, ZIP/tar/cpio archives, U-Boot uImage/FIT containers, and RAE Systems/Honeywell RFP firmware packages (LZARI-decompressing their sections)
-internally (no sudo). Every other format is still identified and located by offset, ready for another tool such as binwalk.
+it can unpack supported file systems, archives, and firmware packages directly,
+without \fBsudo\fR. Supported file systems include SquashFS, ext2/3/4, F2FS,
+JFFS2, UBIFS, romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, HFS+, XFS, btrfs,
+EROFS, and ISO 9660. It also unpacks ZIP, tar, and cpio archives; U-Boot uImage
+and FIT packages; and RAE Systems/Honeywell RFP firmware packages. Other known
+formats are still named and located so another program can handle them.
 .PP
-Output is human-readable by default. A single file shows a findings tree
-(containers nest their contents) followed by a run-stats footer; a directory
-shows per-type counts and the notable findings grouped by directory, then the
-same footer. The one-line assessment is carried in the JSON output only. Pass
+Output is easy to read by default. A single file shows a tree of matches,
+including files found inside other files, followed by totals. A folder shows
+counts by file type and groups important matches by folder. Pass
 .BR \-j / \-\-json
-for a single JSON object, designed to be consumed by an LLM tool caller during
-firmware and IoT assessments.
+to return one structured JSON object for other programs and AI tools.
 .SH ARGUMENTS
 .TP
 .I <file|dir>
-A file to identify, or a directory to scan recursively.
+A file to check, or a folder whose files should be checked.
 .SH OPTIONS
 .SS Output
 .TP
 .BR \-j ", " \-\-json
-Emit JSON instead of the human-readable view (the default). Use this when a
-tool or model will parse the output.
+Return JSON instead of the normal easy-to-read view. Use this when another
+program or AI tool will read the results.
 .TP
 .BR \-A ", " \-\-all
-Keep interior compressed streams. By default moria drops \fBcompression\fR-category
-findings (xz/gzip/lzo nodes) that fall inside a filesystem/container region \(em
-the internal data nodes of a UBI/UBIFS or similar per-node flash filesystem,
-which the filesystem extractor already recovers as real files. This applies to
-both identification and \fB\-\-extract\fR (so extraction does not emit hundreds of
-redundant single-node blobs). \fB\-A\fR restores them in both.
+Show matches found inside larger file systems and packages. moria normally
+hides internal compressed pieces that are already handled when the larger file
+system is unpacked. This keeps the report and output folders from filling with
+duplicate pieces. \fB\-A\fR shows and unpacks those pieces too.
 .TP
 .BR \-E ", " \-\-entropy
-Entropy analysis (off by default). Adds the \fBunidentified_regions\fR list \(em byte
-ranges no finding claims, each with its Shannon entropy \(em and high-entropy
-"possible encryption" hints in the assessment. The analysis is region-aware: a
-filesystem's compressed interior (e.g. the xz data nodes inside a UBIFS volume)
-is not reported as an unidentified high-entropy region, so the hint fires only on
-genuinely unclaimed high-entropy data.
+Measure how random the unknown parts of a file look. This check is off by
+default. The JSON result adds an \fBunidentified_regions\fR list with each part's
+starting byte, size, and entropy score. Entropy is a 0-to-8 measure; a high score
+can mean that data is encrypted or compressed. moria does not warn about
+compressed data that belongs to a file system it already recognized.
 .TP
 .B \-\-list
-List tar/cpio/zip member names and sizes. Does not extract.
+List the names and sizes of files inside tar, cpio, or ZIP archives without
+unpacking them.
 .SS Extract
 .TP
 .BR \-e ", " \-\-extract
-Unpack identified SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS (incl. UBI), romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, EROFS, and ISO9660 filesystems, ZIP/tar/cpio archives, U-Boot uImage/FIT containers, Android boot/sparse images, and RAE Systems/Honeywell RFP firmware packages into
+Unpack supported file systems, archives, Android images, U-Boot packages, and
+RAE Systems/Honeywell RFP firmware packages into
 .IR file .extracted/
-(one subdir per region, named
-.IR 0x<offset>\-<type> ).
-Recurses into nested containers by default (a gzip-wrapped filesystem, a
-filesystem embedded in another), re-scanning each produced file and unpacking
-what it finds, bounded by
-.BR \-\-depth ", " \-\-max\-files ", and " \-\-max\-bytes .
-ext extraction is read-only and needs no sudo. Other formats are
-identification-only. Takes a single file, not a directory.
+(one folder for each match, named
+.IR 0x<starting-byte>\-<type> ).
+moria also checks the files it unpacks and continues through supported files
+found inside them.
+Use
+.BR \-\-depth ", " \-\-max\-files ", and " \-\-max\-bytes
+to limit this work. Reading ext2/3/4 file systems does not change them and
+needs no \fBsudo\fR. Takes one file, not a folder.
 .TP
 .BR \-C ", " \-\-outdir " " \fIdir\fR
-Write extraction output to
+Write unpacked or copied files to
 .I dir
 instead of the default
 .IR file .extracted/ .
 .TP
 .BI \-\-depth " N"
-Maximum extraction recursion depth (default 8).
+Number of file-within-a-file levels to unpack (default 8).
 .B \-\-depth 1
-extracts one level only (no recursion).
+unpacks only matches in the original file.
 .TP
 .BI \-\-max\-files " N"
-Stop extraction after
+Stop after writing
 .I N
-files have been produced across the whole run (default 500000); the manifest is
-marked
+files in total (default 500000). The \fBmanifest.json\fR index is marked
 .IR capped .
 .TP
 .BI \-\-max\-bytes " N"
-Stop extraction after
+Stop after writing
 .I N
-output bytes (default 4294967296 = 4 GiB); the manifest is marked
+bytes in total (default 4294967296, or 4 GiB). The \fBmanifest.json\fR index is marked
 .IR capped .
-A per-extraction decompression-ratio guard (output/input over 1000:1 above
-10 MiB) also stops descent into a likely decompression bomb.
+moria also stops unpacking any item larger than 10 MiB when it expands to more
+than 1,000 times its stored size.
 .SS Carve
 .TP
 .BR \-c ", " \-\-carve
-Dump the raw byte range of each finding, and the unidentified gaps between
-them, to
+Copy the exact bytes for each match, plus unknown gaps between matches, to
 .IR file .carved/
 as
-.IR <offset> \- <type> .bin
-files, WITHOUT parsing. This is the fallback when
+.IR <starting-byte> \- <type> .bin
+files. This operation is called carving. It does not try to understand the
+copied data. Use it when
 .B \-\-extract
-cannot reconstruct a filesystem (vendor obfuscation, an unsupported or corrupt
-variant): the researcher still gets the raw bytes on disk to hand to another
-tool or inspect by hand. A
+cannot rebuild a file system because the data is scrambled, damaged, or not yet
+supported. The copied bytes can then be checked by hand or given to another
+program. An index named
 .I manifest.json
-records each blob's offset, size, and type. Independent of
+records each copied part's starting byte, size, and type. This option works
+separately from
 .BR \-\-extract "; when both are given, carve writes to a sibling"
 .IR file .carved/
-directory. By default sub-kilobyte gaps (usually padding) are not carved;
+folder. By default, gaps smaller than 1 KiB are not copied because they are
+usually unused space;
 .B \-A
-carves every gap. Obeys
+copies every gap. Obeys
 .B \-C
 and
 .BR \-\-max\-bytes .
-Takes a single file, not a directory.
-.SS Scan
+Takes a single file, not a folder.
+.SS More file types
 .TP
 .B \-\-broad
-Also match the ~2500 generated general-format signatures (file(1) Magdir,
-magic tier) on top of the firmware core set.
-.SS Configuration
+Also use about 2,500 general file-recognition rules created from file(1)'s
+Magdir database.
+.SS Settings
 .TP
 .BI \-\-sigs " dir"
-Use a specific signatures directory instead of the bundled ones.
+Use file-recognition rules from a specific folder instead of the built-in rules.
 .TP
 .BI \-\-threads " N"
-Worker count for directory scans. Default: min(cores, 16).
+Number of files to check at the same time during folder checks. The default is
+the number of processor cores, up to 16.
 .SS Information
 .TP
 .BR \-h ", " \-\-help
-Print help and exit.
+Show help and exit.
 .TP
 .B \-\-version
-Print version and exit.
+Show the version and exit.
 .SH EXIT STATUS
 .TP
 .B 0
 Success.
 .TP
 .B 1
-Runtime error (unreadable file, no signatures loaded).
+Could not read a file or load any file-recognition rules.
 .TP
 .B 2
-Usage error (unknown option, missing argument).
+The command is incomplete or includes an unknown option.
 .SH ENVIRONMENT
 .TP
 .B MORIA_SIGDIR
-Overrides the signatures directory (same effect as \fB\-\-sigs\fR).
+Uses file-recognition rules from this folder (same effect as \fB\-\-sigs\fR).
 .TP
 .B XDG_DATA_HOME
 If set, \fBmoria\fR looks for signatures under \fB$XDG_DATA_HOME/moria\fR (else
@@ -156,23 +158,23 @@ If set, \fBmoria\fR looks for signatures under \fB$XDG_DATA_HOME/moria\fR (else
 .B NO_COLOR
 Disables bold section headers in \fB\-\-help\fR output.
 .SH FILES
-When no \fB\-\-sigs\fR or \fBMORIA_SIGDIR\fR is given, signatures are searched
-for, in order, next to the binary (\fB<exe>/../signatures\fR and the install
-sibling \fB<exe>/../share/moria/\fR), then \fB~/.local/share/moria\fR, then
+When no \fB\-\-sigs\fR or \fBMORIA_SIGDIR\fR is given, moria looks for
+recognition rules beside the program (\fB<exe>/../signatures\fR and
+\fB<exe>/../share/moria/\fR), then in \fB~/.local/share/moria\fR, then in
 \fB/usr/local/share/moria\fR and \fB/usr/share/moria\fR. \fBcmake \-\-install\fR
-populates \fB<prefix>/share/moria/\fR.
+places the rules in \fB<prefix>/share/moria/\fR.
 .SH EXAMPLES
 .TP
-Identify one file (human-readable):
+Check one file and show easy-to-read results:
 .B moria firmware.bin
 .TP
-Identify one file as JSON (for a tool or model):
+Check one file and return JSON for another program:
 .B moria \-j firmware.bin
 .TP
-Unpack its filesystems:
+Unpack its file systems:
 .B moria \-e firmware.bin
 .TP
-Carve raw byte ranges to disk without parsing:
+Copy exact byte ranges to separate files:
 .B moria \-c firmware.bin
 .TP
 List archive contents without unpacking:
@@ -181,4 +183,4 @@ List archive contents without unpacking:
 .BR file (1),
 .BR binwalk (1)
 .PP
-Full documentation: skills/moria/README.md
+Full documentation: README.md

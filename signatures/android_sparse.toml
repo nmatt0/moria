@@ -28,7 +28,7 @@ hex = "3aff26ed"
 endian = "little"
 
 [doc]
-description = "Android sparse image (flashable, expands to a raw filesystem)."
+description = "Android sparse disk image; expands into a full file system before installation."
 references = [
   { title = "libsparse sparse_format.h", url = "https://android.googlesource.com/platform/system/core/+/master/libsparse/sparse_format.h" },
 ]

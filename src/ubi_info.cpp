@@ -148,9 +148,9 @@ std::vector<Finding> enrich_ubi_findings(const Reader& r, std::vector<Finding> f
         f.endian = Endian::Big;
         size_t nv = u.volumes.size();
         f.set_confidence(Confidence::Verified,
-                         "UBI volume table: " + std::to_string(nv) + " volume" +
+                         "UBI volume list contains " + std::to_string(nv) + " volume" +
                              (nv != 1 ? "s" : ""));
-        f.description = "UBI (Unsorted Block Images) volume on raw NAND flash.";
+        f.description = "A UBI (Unsorted Block Images) storage volume on NAND flash memory.";
         for (const auto& v : u.volumes) {
             std::string note = v.content.empty() ? (v.is_static ? "static" : "dynamic")
                                                  : v.content;

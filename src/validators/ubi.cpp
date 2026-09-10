@@ -11,7 +11,7 @@ bool validate_ubi(ValidatorCtx& ctx) {
     auto stored = r.at<uint32_t>(off + 60, Endian::Big);  // hdr_crc is big-endian
     if (!hdr || !stored) return true;                     // keep structural default
     if (crc32_ubi(*hdr) == *stored)
-        ctx.out.set_confidence(Confidence::Verified, "UBI header CRC ok");
+        ctx.out.set_confidence(Confidence::Verified, "UBI header checksum matches");
     return true;
 }
 
@@ -26,7 +26,7 @@ bool validate_ubifs(ValidatorCtx& ctx) {
     auto body = r.bytes(off + 8, *len - 8);  // crc covers node[8..len]
     if (!body) return true;
     if (crc32_ubi(*body) == *crc)
-        ctx.out.set_confidence(Confidence::Verified, "UBIFS node CRC ok");
+        ctx.out.set_confidence(Confidence::Verified, "UBIFS record checksum matches");
     return true;
 }
 

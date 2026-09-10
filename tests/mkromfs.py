@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-"""Minimal Linux romfs (rom1fs) builder — synthetic test fixtures only.
+"""Create small Linux romfs (rom1fs) files for tests.
 
-There is no packaged romfs builder on most systems (genromfs is rare), so this
-small serializer lets tests/test_extract.py round-trip a real directory tree
-through moria's romfs extractor. Layout: superblock ("-rom1fs-") + NUL-padded
-volume name, then a depth-first stream of 16-aligned file headers; each
-directory chains its entries (including '.' and '..') via big-endian
-next-pointers, and a directory's spec field points at its first child.
+Most systems do not include a romfs builder, so this tool lets
+tests/test_extract.py create a folder tree, unpack it with moria, and compare the
+result. The code below follows the romfs file layout exactly.
 
 Usage: mkromfs.py <srcdir> <out.romfs>
 """
@@ -32,7 +29,7 @@ class N:
 
 
 def scan_dir(path):
-    """Directory -> list[N] (sorted for determinism)."""
+    """Return the folder's entries in the same order every time."""
     out = []
     for name in sorted(os.listdir(path)):
         full = os.path.join(path, name)

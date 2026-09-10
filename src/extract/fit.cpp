@@ -148,7 +148,7 @@ void emit_sub(const Reader& r, uint64_t fit_off, const Fdt& fdt, const Sub& s, S
     if (s.name.empty()) return;
     auto raw = raw_payload(r, fit_off, fdt, s);
     if (!raw) {
-        out.warnings.push_back("no payload: " + s.name);
+        out.warnings.push_back("section contains no data: " + s.name);
         return;
     }
     std::vector<uint8_t> data;
@@ -159,14 +159,14 @@ void emit_sub(const Reader& r, uint64_t fit_off, const Fdt& fdt, const Sub& s, S
         if (c == Compressor::Unknown || !compressor_supported(c)) {
             // bzip2 / lzo / unknown: keep the stored bytes, flag it.
             data = std::move(*raw);
-            out.warnings.push_back("compression " + s.comp + " not decoded: " + s.name);
+            out.warnings.push_back("cannot unpack " + s.comp + " compression: " + s.name);
         } else {
             auto dec = decompress_stream(c, *raw, MAX_PAYLOAD);
             if (dec) {
                 data = std::move(*dec);
             } else {
                 data = std::move(*raw);
-                out.warnings.push_back("decompress failed (" + s.comp + "): " + s.name);
+                out.warnings.push_back("could not unpack " + s.comp + " data: " + s.name);
             }
         }
     }

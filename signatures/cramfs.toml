@@ -30,7 +30,7 @@ ascii = "Compressed ROMFS"
 endian = "big"
 
 [doc]
-description = "cramfs (compressed ROM filesystem)."
+description = "cramfs, a small compressed file system that cannot be changed."
 references = [
   { title = "cramfs format", url = "https://www.kernel.org/doc/html/latest/filesystems/cramfs.html" },
 ]

@@ -144,7 +144,7 @@ void emit_finding(std::string& o, const Finding& f, bool with_also_matched) {
 }
 
 std::string make_summary(const std::vector<Finding>& findings) {
-    if (findings.empty()) return "no known signatures identified";
+    if (findings.empty()) return "no known file types found";
     // Count by type, preserving first-seen order of appearance.
     std::vector<std::pair<std::string, int>> counts;
     for (const auto& f : findings) {

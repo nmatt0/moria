@@ -101,9 +101,10 @@ bool validate_elf(ValidatorCtx& ctx) {
     if (const char* ty = type_name(*e_type)) ctx.out.label = ty;
 
     if (mach && type_name(*e_type))
-        ctx.out.set_confidence(Confidence::Consistent, "valid ELF class/type/machine");
+        ctx.out.set_confidence(Confidence::Consistent,
+                               "ELF file type and processor details are valid");
     else
-        ctx.out.set_confidence(Confidence::Structural, "ELF e_ident valid");
+        ctx.out.set_confidence(Confidence::Structural, "main ELF marker is valid");
     return true;
 }
 
