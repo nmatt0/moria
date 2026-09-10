@@ -548,6 +548,20 @@ def lantronix():
     return b"NUEVO-2\x00" + bytes((i * 13 + 5) & 0xFF for i in range(1024))
 
 
+def rae_rfp():
+    # RAE Systems / Honeywell RFP firmware package: 0x29-byte header
+    # ("RAE Systems Inc." + u16 version + u32 build_id + "RAE" + 16-byte digest)
+    # then a section table of [u32 name_len; name; u32 flags; u32 usize; u32 csize;
+    # data]. Two stored sections (IniFile, SIGN) landing exactly on EOF -> verified.
+    def section(name, flags, data):
+        return (struct.pack("<I", len(name)) + name +
+                struct.pack("<III", flags, len(data), len(data)) + data)
+    hdr = (b"RAE Systems Inc." + struct.pack("<H", 1) + struct.pack("<I", 0) +
+           b"RAE" + bytes(16))
+    ini = b"; minimal ini\r\n"
+    return hdr + section(b"IniFile", 0, ini) + section(b"SIGN", 0, bytes(96))
+
+
 def random_blob():
     # deterministic pseudo-random, no known magic
     return bytes((i * 37 + 11) & 0xFF for i in range(2048))
@@ -630,6 +644,7 @@ MANIFEST = [
     ("fw.tlv", dlink_tlv, "dlink_tlv", STRUCTURAL),
     ("fw.engenius", engenius, "engenius", STRUCTURAL),
     ("fw.lantronix", lantronix, "lantronix_firmware", STRUCTURAL),
+    ("fw.rfp", rae_rfp, "rae_rfp", VERIFIED),
     ("android_magic_string.bin", android_magic_string, None, 0),
     ("android_magic_at_zero.bin", android_magic_at_zero, None, 0),
     ("jpeg_fp_soi.bin", jpeg_fp_soi, None, 0),

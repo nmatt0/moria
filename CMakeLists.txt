@@ -61,6 +61,8 @@ add_executable(moria
   src/extract/ntfs.cpp
   src/extract/iso9660.cpp
   src/extract/uimage.cpp
+  src/extract/rae_rfp.cpp
+  src/extract/lzari.cpp
   src/extract/fit.cpp
   src/extract/compressed.cpp
   src/extract/android_sparse.cpp
@@ -97,6 +99,7 @@ add_executable(moria
   src/validators/jffs2.cpp
   src/validators/zip.cpp
   src/validators/jpeg.cpp
+  src/validators/rae_rfp.cpp
   src/validators/tar.cpp
   src/validators/ubi.cpp
   src/validators/dtb.cpp
@@ -169,6 +172,7 @@ add_executable(moria_unit
   src/resolve.cpp
   src/ahocorasick.cpp
   src/extract/lzo1x.cpp
+  src/extract/lzari.cpp
   src/deobfuscate/cipher.cpp
 )
 target_include_directories(moria_unit PRIVATE src)
