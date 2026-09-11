@@ -14,6 +14,7 @@
 #include "validators/ubi.hpp"
 #include "validators/uimage.hpp"
 #include "validators/vbf.hpp"
+#include "validators/verity.hpp"
 #include "validators/yaffs2.hpp"
 #include "validators/zip.hpp"
 
@@ -35,6 +36,7 @@ Validator find_validator(const std::string& name) {
     if (name == "jpeg") return validate_jpeg;
     if (name == "rae_rfp") return validate_rae_rfp;
     if (name == "vbf") return validate_vbf;
+    if (name == "verity") return validate_verity;
     if (name == "ubi") return validate_ubi;
     if (name == "ubifs") return validate_ubifs;
     return nullptr;

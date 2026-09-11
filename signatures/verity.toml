@@ -1,0 +1,43 @@
+# NOTE: all root-level keys must precede the first [[magic]] / [doc] table.
+name = "verity"
+category = "crypto"
+
+# The 8-byte on-disk signature is "verity\0\0". Match the full field (including
+# the two NULs) so a "verity" word in text/code cannot anchor a candidate.
+struct = """
+  bytes[8] signature;
+  u32 version;
+  u32 hash_type;
+  bytes[16] uuid;
+  bytes[32] algorithm;
+  u32 data_block_size;
+  u32 hash_block_size;
+  u64 data_blocks;
+  u16 salt_size;
+"""
+
+constraints = [
+  "version == 1",
+  "hash_type <= 1",
+  "data_block_size >= 512",
+  "data_block_size <= 1048576",
+  "hash_block_size >= 512",
+  "hash_block_size <= 1048576",
+  "data_blocks > 0",
+  "salt_size <= 256",
+]
+
+# The validator confirms power-of-two block sizes, reads the hash algorithm, and
+# sizes the finding to the superblock + hash tree.
+validator = "verity"
+
+[[magic]]
+hex = "7665726974790000"
+endian = "little"
+
+[doc]
+description = "dm-verity hash-tree superblock (block-level integrity metadata for a read-only filesystem, e.g. Android system/vendor). Its presence indicates verified boot / rollback protection over the preceding filesystem."
+references = [
+  { title = "dm-verity (kernel docs)", url = "https://www.kernel.org/doc/html/latest/admin-guide/device-mapper/verity.html" },
+  { title = "cryptsetup verity on-disk format", url = "https://gitlab.com/cryptsetup/cryptsetup/-/wikis/DMVerity" },
+]

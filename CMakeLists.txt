@@ -103,6 +103,7 @@ add_executable(moria
   src/validators/jpeg.cpp
   src/validators/rae_rfp.cpp
   src/validators/vbf.cpp
+  src/validators/verity.cpp
   src/validators/tar.cpp
   src/validators/ubi.cpp
   src/validators/dtb.cpp
