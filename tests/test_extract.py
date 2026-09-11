@@ -540,6 +540,43 @@ def test_yaffs2_sparse(work):
     return 0
 
 
+def test_uimage_no_mask(work):
+    """A uImage header with a valid magic but a BAD header CRC must not be trusted
+    for its ih_size: a bogus size that fits in the file would otherwise skip-ahead
+    over (mask) real structures behind it. Place a gzip stream inside the claimed
+    range and require it to still be found. Self-contained."""
+    import struct
+    ih_size = 0x100000                      # 1 MiB claim
+    hdr = bytearray(64)
+    struct.pack_into(">I", hdr, 0, 0x27051956)   # ih_magic
+    struct.pack_into(">I", hdr, 4, 0)            # ih_hcrc = 0 (wrong: real CRC won't be 0)
+    struct.pack_into(">I", hdr, 12, ih_size)     # ih_size (bogus-but-fits)
+    hdr[28:32] = bytes([2, 2, 2, 1])             # os/arch/type/comp plausible
+    gz = bytes([0x1F, 0x8B, 0x08, 0x00]) + b"\0" * 4 + bytes([0x00, 0x03]) + b"\0" * 16
+    buf = bytearray(ih_size + 0x10000)      # ih_size + 64 <= filesize, so the claim "fits"
+    buf[0:64] = hdr
+    gz_off = 0x80000                        # well inside [0, ih_size+64)
+    buf[gz_off:gz_off + len(gz)] = gz
+    blob = os.path.join(work, "uimage_mask.bin")
+    with open(blob, "wb") as f:
+        f.write(buf)
+    r = subprocess.run([MORIA, "-j", blob], capture_output=True)
+    try:
+        findings = json.loads(r.stdout.decode())["findings"]
+    except Exception:
+        print(f"FAIL [uimage-no-mask]: no JSON\n{r.stdout[:200]}")
+        return 1
+    if not any(f["type"] == "gzip" and f["offset"] == gz_off for f in findings):
+        print(f"FAIL [uimage-no-mask]: gzip behind a CRC-bad uImage was masked")
+        return 1
+    ui = [f for f in findings if f["type"] == "uimage"]
+    if ui and ui[0].get("size", 0) >= ih_size:
+        print(f"FAIL [uimage-no-mask]: CRC-bad uImage still sized to ih_size ({ui[0]['size']})")
+        return 1
+    print("PASS [uimage-no-mask]: CRC-bad uImage does not mask; gzip behind it found")
+    return 0
+
+
 def test_verity(work):
     """A dm-verity superblock must be identified and sized to superblock + full
     hash tree (computed from data_blocks / block sizes / digest size). Self-
@@ -1604,6 +1641,7 @@ def main():
         failures += test_yaffs2_extra_header(work)
         failures += test_yaffs2_sparse(work)
         failures += test_verity(work)
+        failures += test_uimage_no_mask(work)
         failures += test_cramfs(work, src, expected)
         failures += test_android_sparse(work, src, expected)
         failures += test_erofs(work, src, expected)
