@@ -82,6 +82,15 @@ std::vector<Finding> resolve(std::vector<Finding> candidates, size_t file_size,
                 m.size = end - m.offset;
                 m.coalesced_count += 1;
                 m.evidence = std::to_string(m.coalesced_count) + " flash regions coalesced";
+                // Carry diagnostics from the merged-away finding (dedup by code),
+                // so a warning on a later region (e.g. one data-only chunk of a
+                // coalesced run) is not lost under the first finding's clean slate.
+                for (auto& d : f.diagnostics) {
+                    bool seen = false;
+                    for (const auto& e : m.diagnostics)
+                        if (e.code == d.code) { seen = true; break; }
+                    if (!seen) m.diagnostics.push_back(std::move(d));
+                }
                 continue;
             }
             f.coalesced_count = 1;

@@ -130,6 +130,22 @@ void emit_finding(std::string& o, const Finding& f, bool with_also_matched) {
     }
     o += "]";
 
+    // diagnostics: array of {severity,code,message} about this finding.
+    if (!f.diagnostics.empty()) {
+        o += ",\"diagnostics\":[";
+        for (size_t i = 0; i < f.diagnostics.size(); ++i) {
+            if (i) o += ",";
+            o += "{\"severity\":\"";
+            escape_to(o, f.diagnostics[i].severity);
+            o += "\",\"code\":\"";
+            escape_to(o, f.diagnostics[i].code);
+            o += "\",\"message\":\"";
+            escape_to(o, f.diagnostics[i].message);
+            o += "\"}";
+        }
+        o += "]";
+    }
+
     // Weaker signatures suppressed at/inside this finding (flat, not recursive).
     if (with_also_matched && !f.also_matched.empty()) {
         o += ",\"also_matched\":[";
@@ -181,6 +197,35 @@ void emit_regions(std::string& o, const std::vector<Region>& regions) {
     o += "]";
 }
 
+// Top-level `diagnostics`: the union of every finding's diagnostics, each
+// enriched with the finding's offset and type so a consumer has one array to
+// check. Per-finding diagnostics also stay on their finding object.
+void emit_diagnostics_union(std::string& o, const std::vector<Finding>& findings) {
+    bool any = false;
+    for (const auto& f : findings)
+        if (!f.diagnostics.empty()) { any = true; break; }
+    if (!any) return;
+    o += ",\"diagnostics\":[";
+    bool first = true;
+    for (const auto& f : findings) {
+        for (const auto& d : f.diagnostics) {
+            if (!first) o += ",";
+            first = false;
+            o += "{\"severity\":\"";
+            escape_to(o, d.severity);
+            o += "\",\"code\":\"";
+            escape_to(o, d.code);
+            o += "\",\"offset\":" + std::to_string(f.offset);
+            o += ",\"type\":\"";
+            escape_to(o, f.type);
+            o += "\",\"message\":\"";
+            escape_to(o, d.message);
+            o += "\"}";
+        }
+    }
+    o += "]";
+}
+
 // `regions`/`assessment` are emitted only for the top-level single-file object
 // (nullptr from per-file tree entries).
 void emit_file_obj(std::string& o, const std::string& path, size_t file_size,
@@ -199,6 +244,7 @@ void emit_file_obj(std::string& o, const std::string& path, size_t file_size,
         emit_finding(o, findings[i], true);
     }
     o += "]";
+    if (top_level) emit_diagnostics_union(o, findings);
     if (regions) emit_regions(o, *regions);
     o += "}";
 }

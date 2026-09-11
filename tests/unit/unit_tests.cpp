@@ -156,6 +156,20 @@ static void test_resolve() {
         CHECK(out.size() == 1);
         CHECK(out[0].size == 100 && out[0].coalesced_count == 2);
     }
+    // Coalesce carries diagnostics from merged-away findings (dedup by code): a
+    // clean region followed by a data-only one must keep the no-oob warning.
+    {
+        std::set<std::string> co = {"yaffs2"};
+        ft::Finding a = mk(0, 50, Confidence::Structural, "yaffs2");    // clean
+        ft::Finding b = mk(50, 50, Confidence::Structural, "yaffs2");
+        b.diagnostics.push_back({"warning", "yaffs2-no-oob", "no oob"});
+        ft::Finding c = mk(100, 50, Confidence::Structural, "yaffs2");
+        c.diagnostics.push_back({"warning", "yaffs2-no-oob", "no oob"});  // duplicate code
+        auto out = ft::resolve({a, b, c}, 200, co);
+        CHECK(out.size() == 1 && out[0].coalesced_count == 3);
+        CHECK(out[0].diagnostics.size() == 1);  // both no-oob warnings, deduped to one
+        CHECK(out[0].diagnostics[0].code == "yaffs2-no-oob");
+    }
 }
 
 // ---------------------------------------------------------------- aho-corasick
