@@ -314,6 +314,40 @@ def test_yaffs2(work, src, expected):
     return 1
 
 
+def test_yaffs2_embedded(work, src):
+    """A real YAFFS2 image placed at a nonzero offset inside a larger blob must be
+    identified as yaffs2 at that offset. Regression for the flat scan only finding
+    yaffs2 at offset 0 (0xFFFF anchor was gated to stream start). Needs `mkyaffs2`.
+    Returns failure count."""
+    if not have("mkyaffs2"):
+        print("SKIP [yaffs2-embedded]: mkyaffs2 (yaffs2utils) not installed")
+        return 0
+    img = os.path.join(work, "embed.yaffs2")
+    r = subprocess.run(["mkyaffs2", "-p", "2048", "-s", "64", src, img], capture_output=True)
+    if r.returncode != 0:
+        print("SKIP [yaffs2-embedded]: mkyaffs2 failed")
+        return 0
+    with open(img, "rb") as f:
+        fs = f.read()
+    off = 3 * 1024 * 1024  # a nonzero, block-aligned offset
+    blob = os.path.join(work, "embedded_fw.bin")
+    with open(blob, "wb") as f:
+        f.write(os.urandom(off) + fs + os.urandom(64 * 1024))
+    r = subprocess.run([MORIA, "-j", blob], capture_output=True)
+    try:
+        findings = json.loads(r.stdout.decode())["findings"]
+    except Exception:
+        print(f"FAIL [yaffs2-embedded]: no JSON\n{r.stdout[:200]}")
+        return 1
+    hit = [f for f in findings if f["type"] == "yaffs2" and f["offset"] == off]
+    if hit:
+        print(f"PASS [yaffs2-embedded]: yaffs2 identified at offset 0x{off:x}")
+        return 0
+    got = sorted({(f["type"], hex(f["offset"])) for f in findings})
+    print(f"FAIL [yaffs2-embedded]: no yaffs2 at 0x{off:x}; findings={got[:6]}")
+    return 1
+
+
 def test_cramfs(work, src, expected):
     """Build a cramfs image with mkfs.cramfs, extract with moria, compare. Needs
     `mkfs.cramfs` (util-linux). Exercises zlib block decompression. Returns
@@ -1327,6 +1361,7 @@ def main():
         failures += test_tar(work, src, expected)
         failures += test_romfs(work, src, expected)
         failures += test_yaffs2(work, src, expected)
+        failures += test_yaffs2_embedded(work, src)
         failures += test_cramfs(work, src, expected)
         failures += test_android_sparse(work, src, expected)
         failures += test_erofs(work, src, expected)

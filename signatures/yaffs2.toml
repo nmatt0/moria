@@ -3,9 +3,14 @@ category = "filesystem"
 
 # YAFFS2 has no format magic. Anchor on the deprecated 0xFFFF "sum" field at
 # offset 8 of the first object header; the validator confirms the header shape.
+# Not `short`: yaffs2 is an embeddable filesystem and must be found mid-stream,
+# not only at offset 0. The 0xFFFF anchor is common, so the validator confirms a
+# real NAND page/OOB geometry at any nonzero offset to keep detection precise.
 magic_offset = 8
-short = true
 validator = "yaffs2"
+# Each object-header chunk anchors its own 0xFFFF hit, so a single image surfaces
+# many per-chunk findings; coalesce them into one region (as jffs2/ubi do).
+coalesce = true
 
 [[magic]]
 hex = "ffff"
