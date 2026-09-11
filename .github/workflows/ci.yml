@@ -38,7 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake clang \
+            cmake g++ clang zlib1g-dev liblzma-dev liblz4-dev libzstd-dev \
             squashfs-tools mtd-utils f2fs-tools erofs-utils xfsprogs btrfs-progs \
             hfsprogs exfatprogs dosfstools ntfs-3g e2fsprogs device-tree-compiler \
             u-boot-tools mtools cpio xorriso zip android-sdk-libsparse-utils
@@ -70,7 +70,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake clang \
+            cmake g++ clang zlib1g-dev liblzma-dev liblz4-dev libzstd-dev \
             squashfs-tools mtd-utils f2fs-tools erofs-utils xfsprogs btrfs-progs \
             hfsprogs exfatprogs dosfstools ntfs-3g e2fsprogs device-tree-compiler \
             u-boot-tools mtools cpio xorriso zip android-sdk-libsparse-utils
@@ -98,7 +98,7 @@ jobs:
       - name: Install clang
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang
+          sudo apt-get install -y --no-install-recommends clang zlib1g-dev liblzma-dev liblz4-dev libzstd-dev
       - name: Build the libFuzzer target
         run: bash fuzz/build.sh
       - name: Fuzz 60s over the seed corpus
