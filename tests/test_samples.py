@@ -92,6 +92,56 @@ def list_members_check():
     return ok
 
 
+def elf_size_sanity():
+    """A bogus section header table (index 0 not SHT_NULL) must not inflate the
+    reported ELF size. Regression for elf_size trusting garbage section offsets,
+    which let an ELF embedded in a yaffs2 image (interleaved with OOB bytes)
+    claim gigabytes and mask every region behind it."""
+    import struct
+    import tempfile
+    FILE_SZ = 0x10000
+    b = bytearray(FILE_SZ)
+    b[0:4] = b"\x7fELF"
+    b[4] = 1  # ELFCLASS32
+    b[5] = 1  # ELFDATA2LSB
+    b[6] = 1  # version
+    struct.pack_into("<H", b, 16, 2)       # e_type = EXEC
+    struct.pack_into("<H", b, 18, 40)      # e_machine = ARM
+    struct.pack_into("<I", b, 20, 1)       # e_version
+    struct.pack_into("<I", b, 28, 0x34)    # e_phoff
+    struct.pack_into("<I", b, 32, 0x2000)  # e_shoff
+    struct.pack_into("<H", b, 40, 52)      # e_ehsize
+    struct.pack_into("<H", b, 42, 32)      # e_phentsize
+    struct.pack_into("<H", b, 44, 1)       # e_phnum
+    struct.pack_into("<H", b, 46, 40)      # e_shentsize
+    struct.pack_into("<H", b, 48, 3)       # e_shnum
+    # One PT_LOAD program header: the real on-disk reach is ~4 KiB.
+    struct.pack_into("<I", b, 0x34 + 0, 1)        # p_type = PT_LOAD
+    struct.pack_into("<I", b, 0x34 + 4, 0)        # p_offset
+    struct.pack_into("<I", b, 0x34 + 16, 0x1000)  # p_filesz
+    # Section table @0x2000: index 0 is NOT the mandatory null entry, and index 1
+    # claims a large in-bounds extent. Both must be ignored.
+    struct.pack_into("<I", b, 0x2000 + 0, 1)       # sh[0].sh_name != 0 -> not SHT_NULL
+    struct.pack_into("<I", b, 0x2000 + 4, 1)       # sh[0].sh_type = PROGBITS
+    struct.pack_into("<I", b, 0x2000 + 40 + 4, 1)      # sh[1].sh_type = PROGBITS
+    struct.pack_into("<I", b, 0x2000 + 40 + 16, 0x100)   # sh[1].sh_offset
+    struct.pack_into("<I", b, 0x2000 + 40 + 20, 0xD000)  # sh[1].sh_size -> end 0xD100
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "bogus_sections.elf")
+        with open(p, "wb") as f:
+            f.write(b)
+        fs = run(p)["findings"]
+    elf = [f for f in fs if f["type"] == "elf" and f["offset"] == 0]
+    if not elf:
+        print(f"  ELF-SIZE: no elf finding (got {[f['type'] for f in fs]})")
+        return False
+    sz = elf[0]["size"]
+    if sz > 0x2000:  # must reflect the ~4 KiB program image, not the 52 KiB garbage
+        print(f"  ELF-SIZE: bogus section table inflated size to {sz:#x} (want <= 0x2000)")
+        return False
+    return True
+
+
 def main():
     if not os.path.exists(BIN):
         print(f"error: {BIN} not built", file=sys.stderr)
@@ -128,7 +178,8 @@ def main():
     cov_ok = coverage_gate()
     load_ok = sig_load_sanity()
     list_ok = list_members_check()
-    if fails or not cov_ok or not load_ok or not list_ok:
+    elf_ok = elf_size_sanity()
+    if fails or not cov_ok or not load_ok or not list_ok or not elf_ok:
         extra = []
         if not cov_ok:
             extra.append("coverage gap")
@@ -136,6 +187,8 @@ def main():
             extra.append("sig-load warnings")
         if not list_ok:
             extra.append("--list broken")
+        if not elf_ok:
+            extra.append("elf-size regression")
         print(f"FAIL: {len(fails)}/{len(gen_samples.MANIFEST)} samples"
               f"{(' + ' + ', '.join(extra)) if extra else ''}")
         return 1
