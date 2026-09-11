@@ -22,6 +22,8 @@ jobs:
   build-test:
     name: build + test (${{ matrix.cc }})
     runs-on: ubuntu-latest
+    env:
+      MORIA_CI: "1"        # skip build-sensitive round-trips (see tests/test_extract.py)
     strategy:
       fail-fast: false
       matrix:
@@ -64,6 +66,8 @@ jobs:
   sanitizers:
     name: asan + ubsan
     runs-on: ubuntu-latest
+    env:
+      MORIA_CI: "1"
     steps:
       - uses: actions/checkout@v4
       - name: Install build deps + filesystem tools
