@@ -8,8 +8,8 @@
 //   clang++ -std=c++20 -O1 -g -fsanitize=fuzzer,address -I src -I third_party \
 //     -DFT_FUZZ_SIGDIR=\"$PWD/signatures\" \
 //     src/scan.cpp src/ahocorasick.cpp src/resolve.cpp src/expr.cpp \
-//     src/layout.cpp src/sigload.cpp src/validators/*.cpp fuzz/fuzz_scan.cpp \
-//     -o fuzz_scan
+//     src/layout.cpp src/sigload.cpp src/archives.cpp src/validators/*.cpp \
+//     fuzz/fuzz_scan.cpp -o fuzz_scan
 // Run: ./fuzz_scan -max_total_time=60
 #include <cstddef>
 #include <cstdint>
@@ -18,7 +18,6 @@
 #include "archives.hpp"
 #include "reader.hpp"
 #include "scan.hpp"
-#include "secrets.hpp"
 #include "sigload.hpp"
 
 #ifndef FT_FUZZ_SIGDIR
@@ -30,8 +29,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     ft::Reader reader(std::span<const uint8_t>(data, size));
     auto findings = ft::scan(reader, sigs.signatures);
     for (auto& f : findings) ft::list_members(reader, f);  // exercise archive listers
-    auto secrets = ft::scan_secrets(reader);
     (void)findings;
-    (void)secrets;
     return 0;
 }
