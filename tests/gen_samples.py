@@ -562,6 +562,40 @@ def rae_rfp():
     return hdr + section(b"IniFile", 0, ini) + section(b"SIGN", 0, bytes(96))
 
 
+def _crc16_ccitt(data):
+    # CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF), the VBF per-block checksum.
+    crc = 0xFFFF
+    for b in data:
+        crc ^= b << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
+    return crc
+
+
+def vbf():
+    # VBF (Versatile Binary Format) ECU container: ASCII "vbf_version = X.Y;" +
+    # a brace-delimited header block, then binary blocks
+    # [u32 be start][u32 be len][data][u16 be crc16-over-decompressed].
+    # data_format_identifier = 0x00 (raw): the per-block CRC16 is verifiable
+    # here, so a two-block image landing exactly on EOF -> verified.
+    hdr = (b'vbf_version = 3.0;\r\n\r\n'
+           b'header {\r\n'
+           b'   description = { "synthetic VBF" };\r\n'
+           b'   sw_part_number = "AA00-14D007-AA";\r\n'
+           b'   sw_part_type = DATA;\r\n'
+           b'   data_format_identifier = 0x00;\r\n'
+           b'   ecu_address = 0x730;\r\n'
+           b'   file_checksum = 0x00000000;\r\n'
+           b'}')
+
+    def block(addr, data):
+        return struct.pack(">II", addr, len(data)) + data + struct.pack(">H", _crc16_ccitt(data))
+
+    b0 = bytes((i * 7 + 3) & 0xFF for i in range(256))
+    b1 = b"CALIBRATION\x00" * 4
+    return hdr + block(0x00FD0000, b0) + block(0x10000400, b1)
+
+
 def random_blob():
     # deterministic pseudo-random, no known magic
     return bytes((i * 37 + 11) & 0xFF for i in range(2048))
@@ -645,6 +679,7 @@ MANIFEST = [
     ("fw.engenius", engenius, "engenius", STRUCTURAL),
     ("fw.lantronix", lantronix, "lantronix_firmware", STRUCTURAL),
     ("fw.rfp", rae_rfp, "rae_rfp", VERIFIED),
+    ("fw.vbf", vbf, "vbf", VERIFIED),
     ("android_magic_string.bin", android_magic_string, None, 0),
     ("android_magic_at_zero.bin", android_magic_at_zero, None, 0),
     ("jpeg_fp_soi.bin", jpeg_fp_soi, None, 0),

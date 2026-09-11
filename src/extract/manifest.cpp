@@ -29,6 +29,7 @@
 #include "extract/yaffs2.hpp"
 #include "extract/ubifs.hpp"
 #include "extract/uimage.hpp"
+#include "extract/vbf.hpp"
 #include "extract/fit.hpp"
 
 namespace ft {
@@ -53,6 +54,7 @@ Extractor find_extractor(const std::string& type) {
     if (type == "iso9660" || type == "iso") return extract_iso9660;
     if (type == "uimage") return extract_uimage;
     if (type == "rae_rfp") return extract_rae_rfp;
+    if (type == "vbf") return extract_vbf;
     if (type == "fit") return extract_fit;
     if (type == "gzip" || type == "xz" || type == "zstd" || type == "lz4" || type == "lz4_legacy")
         return extract_compressed;
