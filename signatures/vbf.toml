@@ -1,0 +1,22 @@
+name = "vbf"
+category = "firmware"
+
+# VBF (Versatile Binary Format): Ford/Volvo ECU programming container. An ASCII
+# header ("vbf_version = X.Y;" then a brace-delimited `header { ... }` block with
+# sw_part_number / ecu_address / data_format_identifier / file_checksum), then a
+# chain of binary blocks: u32 be start_address, u32 be length, length bytes of
+# data (raw, or LZSS when data_format_identifier's upper nibble is set), u16 be
+# CRC16-CCITT over the decompressed data. The validator matches the header
+# braces, walks the block chain to the exact span, and verifies the per-block
+# CRC16 on uncompressed blocks.
+confidence = "structural"
+
+validator = "vbf"
+
+[[magic]]
+ascii = "vbf_version"
+endian = "little"
+
+[doc]
+description = "VBF (Versatile Binary Format) ECU firmware container (Ford/Volvo); ASCII header + CRC16-checked binary blocks, optionally LZSS-compressed."
+references = [ { title = "VBF format notes (ford-pscm-re)", url = "https://github.com/ghostdev137/ford-pscm-re/blob/main/docs/vbf-format.md" } ]
