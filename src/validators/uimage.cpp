@@ -71,10 +71,18 @@ bool validate_uimage(ValidatorCtx& ctx) {
         if (!name.empty()) ctx.out.label = name;  // the embedded uImage image name
     }
 
-    if (got == want)
+    if (got == want) {
         ctx.out.set_confidence(Confidence::Verified, "header CRC32 ok");
-    else
-        ctx.out.set_confidence(Confidence::Structural, "header CRC32 mismatch");
+    } else {
+        // Header CRC failed: this is not a validated uImage, so its ih_size field
+        // (and the region size the signature derived from it) is untrusted. A
+        // bogus ih_size that happens to fit in the file would otherwise let this
+        // finding own — and skip-ahead past, masking — gigabytes of real data
+        // behind it. Report the header but do not trust its size (mirrors the ELF
+        // size guard). A genuine uImage has a valid header CRC.
+        ctx.out.size = 0;
+        ctx.out.set_confidence(Confidence::Structural, "header CRC32 mismatch (size not trusted)");
+    }
     return true;
 }
 
