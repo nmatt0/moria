@@ -35,6 +35,7 @@ inline const char* mime_for_type(const std::string& t) {
     if (t == "pdf") return "application/pdf";
     // --- match `file --mime-type`'s specific spellings --------------------
     if (t == "elf") return "application/x-executable";
+    if (t == "upx") return "application/x-upx";
     if (t == "ihex") return "text/x-hex";
     if (t == "iso9660") return "application/x-iso9660-image";
     if (t == "certificate") return "application/x-x509-ca-cert";

@@ -95,6 +95,7 @@ add_executable(moria
   src/validators/squashfs.cpp
   src/validators/uimage.cpp
   src/validators/elf.cpp
+  src/validators/upx.cpp
   src/validators/cpio.cpp
   src/validators/ihex.cpp
   src/validators/yaffs2.cpp
@@ -178,6 +179,7 @@ add_executable(moria_unit
   src/extract/lzo1x.cpp
   src/extract/lzari.cpp
   src/deobfuscate/cipher.cpp
+  src/validators/upx.cpp
 )
 target_include_directories(moria_unit PRIVATE src)
 

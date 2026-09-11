@@ -6,7 +6,11 @@
 #include <algorithm>
 #include <string>
 
+#include "validators/upx.hpp"
+
 namespace ft {
+
+void detect_upx_tamper(ValidatorCtx& ctx, Endian e, bool is64);
 
 namespace {
 uint64_t field(const FieldMap& f, const char* k) {
@@ -134,7 +138,37 @@ bool validate_elf(ValidatorCtx& ctx) {
         ctx.out.set_confidence(Confidence::Consistent, "valid ELF class/type/machine");
     else
         ctx.out.set_confidence(Confidence::Structural, "ELF e_ident valid");
+
+    detect_upx_tamper(ctx, e, ei_class == 2);
     return true;
+}
+
+// A UPX-packed ELF has its section-header table stripped (e_shoff/e_shnum == 0)
+// and carries the UPX loader ident string. A clean stub is reported separately
+// by the `upx` PackHeader signature; but embedded-firmware and malware samples
+// routinely zero or alter the "UPX!" trailer magic so `upx -d` fails and the
+// PackHeader signature cannot match. When the ident is present but no valid
+// PackHeader survives, flag the ELF so the caveat is not lost.
+void detect_upx_tamper(ValidatorCtx& ctx, Endian e, bool is64) {
+    const Reader& r = ctx.reader;
+    const size_t off = ctx.offset;
+    const uint64_t e_shoff = is64 ? (r.at<uint64_t>(off + 40, e).value_or(0))
+                                  : (r.at<uint32_t>(off + 32, e).value_or(0));
+    const uint16_t e_shnum = is64 ? (r.at<uint16_t>(off + 60, e).value_or(0))
+                                  : (r.at<uint16_t>(off + 48, e).value_or(0));
+    if (e_shoff != 0 && e_shnum != 0) return;  // normal ELF: section table present
+
+    const size_t end = r.size();
+    if (!has_upx_ident(r, off, end)) return;               // not a UPX stub
+    if (find_upx_packheader(r, off, end)) return;          // clean: `upx` sig reports it
+
+    std::string ver = upx_release_from_ident(r, off, end);
+    std::string msg = "UPX loader ident present but no valid PackHeader trailer "
+                      "(the \"UPX!\" magic was zeroed or altered); standard `upx -d` "
+                      "will fail. Recover the header or carve the compressed stream.";
+    ctx.out.diagnostics.push_back({"warning", "upx-tampered-header", std::move(msg)});
+    ctx.out.label = ver.empty() ? "UPX-packed (header tampered)"
+                                : ("UPX-packed (header tampered); UPX " + ver);
 }
 
 }  // namespace ft

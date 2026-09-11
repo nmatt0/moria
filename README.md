@@ -8,6 +8,7 @@ moria identifies files and the structures embedded inside firmware and IoT image
 
 - **Extracts a broad set of filesystems in-process, without sudo:** SquashFS, ext2/3/4, F2FS, XFS, btrfs, HFS+, NTFS, EROFS, JFFS2, UBIFS, and more.
 - **Recursive by default.** A gzip-wrapped SquashFS inside a UBI volume unpacks all the way down.
+- **Flags packed executables.** Detects UPX-packed ELF/PE/Mach-O across architectures from the checksum-verified PackHeader trailer (format, method, and sizes), and flags stubs whose header was zeroed or altered to defeat `upx -d`.
 - **Deterministic.** The same input always produces the same output; conflict resolution has no random tie-break.
 - **Safe on hostile input.** Every read is bounds-checked, every write goes through `openat` + `O_NOFOLLOW` (no path-traversal or symlink escape), and decompression is bounded against bombs.
 - **Identification-first.** A readable tree by default, JSON (`-j`) for tools, with offsets and confidence on every finding.

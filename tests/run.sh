@@ -18,6 +18,9 @@ python3 tests/test_extract.py
 python3 tests/test_rae_rfp.py
 # VBF block extraction + LZSS decode round-trip (self-contained hard gate).
 python3 tests/test_vbf.py
+# UPX PackHeader detection + tampered-header heuristic (self-contained; also
+# cross-checks the real `upx` tool when installed).
+python3 tests/test_upx.py
 
 echo "[3/4] the corpus accuracy (informational)"
 if [ -d "${MORIA_CORPUS:-corpus}" ]; then

@@ -314,6 +314,51 @@ def elf64_le():
     return _elf(2, 1, 183)   # AArch64
 
 
+def _upx_trailer(fmt=22, method=2, version=14, level=8, u_len=0xC00, c_len=0x400, filt=0):
+    # A UPX PackHeader trailer (little-endian, non-DOS, 32 bytes). The final byte
+    # is the header checksum UPX has embedded since version 10: sum of bytes
+    # [4..30] modulo 251. moria verifies it, so a correct one -> verified tier.
+    p = bytearray(32)
+    p[0:4] = b"UPX!"
+    p[4], p[5], p[6], p[7] = version, fmt, method, level
+    struct.pack_into("<I", p, 16, u_len)
+    struct.pack_into("<I", p, 20, c_len)
+    struct.pack_into("<I", p, 24, u_len)   # u_file_size
+    p[28] = filt
+    p[31] = sum(p[4:31]) % 251
+    return bytes(p)
+
+
+def upx_packed():
+    # A synthetic UPX-packed ELF64/amd64 stub: a section-stripped ELF header + one
+    # PT_LOAD, a filler "compressed" body carrying the UPX loader ident banner,
+    # then the checksum-verified PackHeader trailer as an overlay. No real UPX
+    # payload is embedded (no third-party IP); only the public header structure is
+    # synthesized. moria reports both elf (consistent) and upx (verified).
+    ident = (b"$Info: This file is packed with the UPX executable packer "
+             b"http://upx.sf.net $\n\x00"
+             b"$Id: UPX 4.24 Copyright (C) 1996-2024 the UPX Team. "
+             b"All Rights Reserved. $\n\x00")
+    body_len = 0x400
+    b = bytearray(body_len)
+    b[0:4] = b"\x7fELF"
+    b[4], b[5], b[6] = 2, 1, 1                # ELFCLASS64, ELFDATA2LSB, version
+    struct.pack_into("<H", b, 16, 2)          # e_type = EXEC
+    struct.pack_into("<H", b, 18, 62)         # e_machine = x86-64
+    struct.pack_into("<I", b, 20, 1)
+    struct.pack_into("<Q", b, 32, 64)         # e_phoff
+    struct.pack_into("<Q", b, 40, 0)          # e_shoff = 0 (section table stripped)
+    struct.pack_into("<H", b, 52, 64)         # e_ehsize
+    struct.pack_into("<H", b, 54, 56)         # e_phentsize
+    struct.pack_into("<H", b, 56, 1)          # e_phnum
+    struct.pack_into("<H", b, 60, 0)          # e_shnum = 0
+    struct.pack_into("<I", b, 64 + 0, 1)      # PT_LOAD
+    struct.pack_into("<Q", b, 64 + 8, 0)      # p_offset
+    struct.pack_into("<Q", b, 64 + 32, body_len)  # p_filesz (trailer is overlay)
+    b[body_len - len(ident):body_len] = ident
+    return bytes(b) + _upx_trailer(c_len=body_len, u_len=body_len * 3)
+
+
 def android_boot():
     b = _buf(1024)
     b[0:8] = b"ANDROID!"
@@ -672,6 +717,7 @@ MANIFEST = [
     ("blob.bz2", bzip2, "bzip2", STRUCTURAL),
     ("prog32.elf", elf32_le, "elf", CONSISTENT),
     ("prog64.elf", elf64_le, "elf", CONSISTENT),
+    ("prog.upx", upx_packed, "upx", VERIFIED),
     ("boot.img", android_boot, "android_boot", STRUCTURAL),
     ("super.sparse", android_sparse, "android_sparse", CONSISTENT),
     ("pieeprom.bin", rpi_eeprom, "rpi_eeprom", STRUCTURAL),
