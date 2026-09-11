@@ -36,6 +36,18 @@ struct Reference {
     std::string url;
 };
 
+// A diagnostic: something the reader should know about a finding (or the file)
+// that the identification itself does not convey — a degraded result or a
+// caveat. `severity` is "error" (moria could not do something it normally does),
+// "warning" (a caveat or reduced confidence), or "info" (a neutral note).
+// `code` is a stable machine slug (e.g. "yaffs2-no-oob"); `message` is the human
+// sentence. When attached to a finding, its offset/type come from the finding.
+struct Diagnostic {
+    std::string severity;
+    std::string code;
+    std::string message;
+};
+
 // An archive member (name + uncompressed size), from --list; also a container's
 // sub-component (a UBI volume). `note` carries a short descriptor (a UBI
 // volume's content type, e.g. "squashfs" / "ubifs · dynamic"); empty otherwise.
@@ -71,6 +83,11 @@ struct Finding {
     std::string vendor;
     std::vector<Reference> references;
     std::vector<std::string> limitations;
+
+    // Diagnostics about this finding (missing OOB, CRC mismatch, clamped size,
+    // partial extraction, ...). Surfaced in the NOTES column and the diagnostics
+    // section/array; empty for a clean finding.
+    std::vector<Diagnostic> diagnostics;
 
     // Number of same-type regions merged into this one (per-node formats). 1 = not coalesced.
     uint32_t coalesced_count = 1;

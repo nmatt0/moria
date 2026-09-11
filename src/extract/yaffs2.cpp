@@ -101,9 +101,17 @@ std::optional<uint32_t> u32(const Reader& r, uint64_t off) {
     return r.at<uint32_t>(off, Endian::Little);
 }
 
+// yaffs2 packs "extra header info" into an object-header chunk's tag: chunkId
+// carries EXTRA_HEADER_INFO_FLAG (bit 31) with the parent id in the low bits,
+// and objectId's top nibble holds the object type. So a header chunk's stored
+// chunkId is not literally 0, and its objectId must be masked to the real id.
+constexpr uint32_t YAFFS_EXTRA_HEADER_FLAG = 0x8000'0000u;
+constexpr uint32_t YAFFS_OBJECTID_MASK = 0x0fff'ffffu;
+bool is_header_chunkid(uint32_t c) { return c == 0 || (c & YAFFS_EXTRA_HEADER_FLAG); }
+
 // Detect (page, spare). Standard NAND geometries; pick the first where the whole
 // image divides evenly and chunk 0 parses as an object header (type 1..5) with a
-// sane tag (objectId >= 1, chunkId == 0) at the MTD tag offset.
+// sane tag (objectId >= 1, header chunkId) at the MTD tag offset.
 bool detect_geometry(Ctx& c) {
     static const std::pair<size_t, size_t> GEOS[] = {
         {2048, 64}, {2048, 128}, {4096, 128}, {4096, 224}, {512, 16}, {2048, 32}, {8192, 256},
@@ -119,7 +127,9 @@ bool detect_geometry(Ctx& c) {
             auto objid = u32(c.r, c.base + page + tag_off + 4);
             auto chunkid = u32(c.r, c.base + page + tag_off + 8);
             if (!objid || !chunkid) continue;
-            if (*objid < 1 || *objid == 0xffffffff || *chunkid != 0) continue;
+            if (*objid == 0xffffffff || (*objid & YAFFS_OBJECTID_MASK) < 1 ||
+                !is_header_chunkid(*chunkid))
+                continue;
             c.g = {page, spare, stride, tag_off};
             return true;
         }
@@ -139,13 +149,14 @@ void scan_chunks(Ctx& c) {
         auto bytecount = u32(c.r, tag + 12);
         if (!objid || !chunkid || !bytecount) continue;
         if (*objid == 0 || *objid == 0xffffffff) continue;  // unused/erased
+        const uint32_t oid = *objid & YAFFS_OBJECTID_MASK;  // strip packed type bits
 
-        if (*chunkid == 0) {  // object header
+        if (is_header_chunkid(*chunkid)) {  // object header (chunkId 0, maybe extra-encoded)
             auto type = u32(c.r, chunk + OH_TYPE);
             auto parent = u32(c.r, chunk + OH_PARENT);
             auto mode = u32(c.r, chunk + OH_MODE);
             if (!type || !parent || *type < 1 || *type > 5) continue;
-            Object& o = c.objs[*objid];
+            Object& o = c.objs[oid];
             o.seen = true;  // later header wins (newest)
             o.type = *type;
             o.parent = *parent;
@@ -159,7 +170,7 @@ void scan_chunks(Ctx& c) {
             }
         } else {  // data chunk
             const uint32_t cid = *chunkid;
-            Object& o = c.objs[*objid];
+            Object& o = c.objs[oid];
             o.data[cid] = static_cast<size_t>(chunk);  // newest position wins
             if (cid >= o.last_chunk) {
                 o.last_chunk = cid;
@@ -231,7 +242,15 @@ bool extract_yaffs2(const Reader& r, const Finding& f, SafeRoot& root, const std
     out.type = "yaffs2";
     out.root = subdir;
 
-    Ctx c{r, f.offset, r.size(), {}, root, subdir, out};
+    // Bound the walk to the region identify sized (image_size returns a whole
+    // number of chunks), not the whole file. Otherwise a truncated/carved image
+    // or a mid-stream region makes (end - base) not a chunk multiple — failing
+    // the geometry's even-division check — and, worse, the scan bleeds into the
+    // next partition. A yaffs2 finding without a size (data-only) falls back to
+    // EOF, where detect_geometry will decline anyway.
+    uint64_t end = r.size();
+    if (f.size > 0 && f.offset + f.size <= r.size()) end = f.offset + f.size;
+    Ctx c{r, f.offset, end, {}, root, subdir, out};
     if (!detect_geometry(c)) {
         // No usable page+OOB geometry: almost certainly a data-only dump whose
         // spare/tags were stripped. Nothing can reconstruct that.

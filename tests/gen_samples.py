@@ -342,6 +342,24 @@ def yaffs2():
     return bytes(b)
 
 
+def verity():
+    # dm-verity superblock (Linux verity_super_block), all little-endian. Fields
+    # the validator reads: version==1, hash_type<=1, power-of-two data/hash block
+    # sizes, data_blocks>0, sha256 algorithm. data_blocks=1 -> the hash tree is
+    # just the superblock block, so the sized region fits this fixture.
+    b = _buf(4096)
+    b[0:8] = b"verity\x00\x00"
+    struct.pack_into("<I", b, 8, 1)        # version
+    struct.pack_into("<I", b, 12, 1)       # hash_type
+    b[16:32] = bytes(range(16))            # uuid
+    b[32:38] = b"sha256"                   # algorithm[32]
+    struct.pack_into("<I", b, 64, 4096)    # data_block_size
+    struct.pack_into("<I", b, 68, 4096)    # hash_block_size
+    struct.pack_into("<Q", b, 72, 1)       # data_blocks
+    struct.pack_into("<H", b, 80, 32)      # salt_size
+    return bytes(b)
+
+
 def ihex():
     data = bytes(range(16))
     rec = bytes([0x10, 0x00, 0x00, 0x00]) + data
@@ -661,6 +679,7 @@ MANIFEST = [
     ("u-boot.bin", uboot, "uboot", MAGIC),
     ("rootfs.yaffs2", yaffs2, "yaffs2", STRUCTURAL),
     ("rootfs_be.yaffs2", yaffs2_be, "yaffs2", STRUCTURAL),
+    ("hashtree.verity", verity, "verity", CONSISTENT),
     ("firmware.hex", ihex, "ihex", CONSISTENT),
     ("image.png", png, "png", CONSISTENT),
     ("image.gif", gif, "gif", STRUCTURAL),

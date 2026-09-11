@@ -35,6 +35,12 @@ struct Palette {
         if (f.type == "private_key") return "\033[31m";  // red
         return "";
     }
+    const char* sev(const std::string& s) const {
+        if (!on) return "";
+        if (s == "error") return "\033[31m";    // red
+        if (s == "warning") return "\033[33m";   // yellow
+        return "\033[2m";                        // info: faint
+    }
 };
 
 std::string human_size(size_t n) {
@@ -76,7 +82,10 @@ std::string clean_label(const std::string& s, size_t cap = 40) {
 }
 
 // Compact "notes" column: endianness, arch, version, compression, label, etc.
-std::string notes_for(const Finding& f) {
+// The caller renders the whole string dim; diagnostic tags are re-colored by
+// severity (a warning is yellow) so they catch the eye down the NOTES column
+// while the rest stays faint. Tags come last, so the color escapes don't bleed.
+std::string notes_for(const Finding& f, const Palette& p) {
     std::vector<std::string> parts;
     std::string ev = endian_name(f.endian);
     if (!f.arch.empty()) ev += "/" + f.arch;
@@ -89,6 +98,17 @@ std::string notes_for(const Finding& f) {
     std::string s;
     for (size_t i = 0; i < parts.size(); ++i) s += (i ? " " : "") + parts[i];
     if (!f.label.empty()) s += (s.empty() ? "" : "  ") + ("\"" + clean_label(f.label) + "\"");
+    // Terse per-finding diagnostic tags, e.g. "[warn: no-oob]". The short tag is
+    // the code with a redundant leading "<type>-" stripped; the full message is
+    // in the diagnostics section.
+    for (const auto& d : f.diagnostics) {
+        std::string tag = d.code;
+        std::string pfx = f.type + "-";
+        if (tag.rfind(pfx, 0) == 0) tag = tag.substr(pfx.size());
+        std::string sev = d.severity == "error" ? "err" : d.severity == "warning" ? "warn" : "info";
+        s += (s.empty() ? "" : " ");
+        s += p.sev(d.severity) + ("[" + sev + ": " + tag + "]") + p.reset();
+    }
     return s;
 }
 
@@ -306,8 +326,63 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
         line += "  ";
         col(line, r.f->confidence_tier, w_tier, p.tier(r.f->confidence_tier), p.reset());
         line += "  ";
-        line += p.dim() + notes_for(*r.f) + p.reset();
+        line += p.dim() + notes_for(*r.f, p) + p.reset();
         while (!line.empty() && line.back() == ' ') line.pop_back();
+        o += line + "\n";
+    }
+}
+
+// A flattened diagnostic for rendering: the finding's offset/type + the message.
+struct DiagRow {
+    std::string severity, code, type, message;
+    size_t offset;
+};
+
+std::vector<DiagRow> gather_diagnostics(const std::vector<Finding>& fs) {
+    std::vector<DiagRow> rows;
+    for (const auto& f : fs)
+        for (const auto& d : f.diagnostics)
+            rows.push_back({d.severity, d.code, f.type, d.message, f.offset});
+    // errors first, then warnings, then info; ties by offset.
+    auto rank = [](const std::string& s) { return s == "error" ? 0 : s == "warning" ? 1 : 2; };
+    std::sort(rows.begin(), rows.end(), [&](const DiagRow& a, const DiagRow& b) {
+        if (rank(a.severity) != rank(b.severity)) return rank(a.severity) < rank(b.severity);
+        return a.offset < b.offset;
+    });
+    return rows;
+}
+
+// The diagnostics section: a table SEVERITY | OFFSET | TYPE | MESSAGE listing
+// every finding's diagnostics. The single place to scan for trouble; the NOTES
+// column flags each in situ.
+void emit_diagnostics_section(std::string& o, const Palette& p, const std::vector<DiagRow>& rows) {
+    if (rows.empty()) return;
+    size_t w_sev = 8, w_off = 6, w_type = 4;
+    for (const auto& r : rows) {
+        w_sev = std::max(w_sev, r.severity.size());
+        w_off = std::max(w_off, hex_off(r.offset).size());
+        w_type = std::max(w_type, r.type.size());
+    }
+    o += p.dim();
+    o += "\ndiagnostics:\n";
+    o += p.reset();
+    std::string h = "  ";
+    col(h, "SEVERITY", w_sev, "", "");
+    h += "  ";
+    col(h, "OFFSET", w_off, "", "");
+    h += "  ";
+    col(h, "TYPE", w_type, "", "");
+    h += "  MESSAGE";
+    o += p.dim() + h + p.reset() + "\n";
+    for (const auto& r : rows) {
+        std::string line = "  ";
+        col(line, r.severity, w_sev, p.sev(r.severity), p.reset());
+        line += "  ";
+        col(line, hex_off(r.offset), w_off, p.off(), p.reset());
+        line += "  ";
+        col(line, r.type, w_type, "", "");
+        line += "  ";
+        line += r.message;
         o += line + "\n";
     }
 }
@@ -317,6 +392,21 @@ std::string emit_file_human(const std::vector<Finding>& findings,
                             bool color, bool all) {
     Palette p{color};
     std::string o;
+
+    // Errors-only banner at the very top: a "moria could not do this" result
+    // must not be buried under a long findings table. Warnings/info live only in
+    // the diagnostics section and the NOTES column.
+    auto diags = gather_diagnostics(findings);
+    size_t nerr = 0;
+    for (const auto& d : diags)
+        if (d.severity == "error") ++nerr;
+    if (nerr > 0) {
+        o += p.sev("error");
+        o += (nerr == 1 ? "! 1 error" : "! " + std::to_string(nerr) + " errors");
+        o += " — see diagnostics below\n\n";
+        o += p.reset();
+    }
+
     if (findings.empty()) {
         o += p.dim();
         o += "No known structures identified.\n";
@@ -324,6 +414,9 @@ std::string emit_file_human(const std::vector<Finding>& findings,
     } else {
         emit_findings_tree(o, p, findings, all);
     }
+
+    // What's wrong with what's here — after the table, before the regions/footer.
+    emit_diagnostics_section(o, p, diags);
 
     if (!regions.empty()) {
         o += p.dim();
@@ -405,7 +498,7 @@ std::string emit_tree_human(const TreeResult& tr, const std::string& footer, boo
             col(row, n.finding.type, w_type, tc, p.reset());
             row += "  ";
             row += p.dim();
-            row += notes_for(n.finding);
+            row += notes_for(n.finding, p);
             row += p.reset();
             while (!row.empty() && row.back() == ' ') row.pop_back();
             o += row + "\n";

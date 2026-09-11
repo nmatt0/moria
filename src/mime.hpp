@@ -38,6 +38,7 @@ inline const char* mime_for_type(const std::string& t) {
     if (t == "ihex") return "text/x-hex";
     if (t == "iso9660") return "application/x-iso9660-image";
     if (t == "certificate") return "application/x-x509-ca-cert";
+    if (t == "verity") return "application/x-verity-hash";
     if (t == "private_key") return "application/x-pem-file";
     if (t == "rpi_eeprom") return "application/x-raspberry-eeprom";
     // --- filesystems (no registered MIME; specific x- form) ---------------

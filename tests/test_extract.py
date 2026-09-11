@@ -340,12 +340,250 @@ def test_yaffs2_embedded(work, src):
         print(f"FAIL [yaffs2-embedded]: no JSON\n{r.stdout[:200]}")
         return 1
     hit = [f for f in findings if f["type"] == "yaffs2" and f["offset"] == off]
-    if hit:
-        print(f"PASS [yaffs2-embedded]: yaffs2 identified at offset 0x{off:x}")
+    if not hit:
+        got = sorted({(f["type"], hex(f["offset"])) for f in findings})
+        print(f"FAIL [yaffs2-embedded]: no yaffs2 at 0x{off:x}; findings={got[:6]}")
+        return 1
+    # Sizing: a confirmed OOB geometry must size the finding to ~the whole image
+    # (the walk trims trailing erased padding, so allow a small shortfall), not a
+    # single 2 KiB chunk.
+    size = hit[0].get("size", 0)
+    if not (len(fs) * 0.5 <= size <= len(fs)):
+        print(f"FAIL [yaffs2-embedded]: bad size 0x{size:x} for a 0x{len(fs):x} image")
+        return 1
+    # Interior masking: nothing inside [off, off+size) may surface as its own
+    # finding (files in the image must not leak as top-level hits).
+    leaked = [f for f in findings if f is not hit[0] and off < f["offset"] < off + size]
+    if leaked:
+        got = sorted({(f["type"], hex(f["offset"])) for f in leaked})
+        print(f"FAIL [yaffs2-embedded]: {len(leaked)} interior findings leaked: {got[:6]}")
+        return 1
+    print(f"PASS [yaffs2-embedded]: yaffs2 @0x{off:x} sized 0x{size:x}, interior masked")
+    return 0
+
+
+def test_yaffs2_dataonly(work, src):
+    """A YAFFS2 image whose OOB/spare has been stripped (a `dd`/mtdblock dump) is
+    not sizable or extractable, but its object headers survive. moria must still
+    identify it as ONE yaffs2 region (not a swarm of per-header fragments) and
+    attach the `yaffs2-no-oob` diagnostic pointing at re-dumping with spare.
+    Needs `mkyaffs2`. Returns failure count."""
+    if not have("mkyaffs2"):
+        print("SKIP [yaffs2-dataonly]: mkyaffs2 (yaffs2utils) not installed")
         return 0
-    got = sorted({(f["type"], hex(f["offset"])) for f in findings})
-    print(f"FAIL [yaffs2-embedded]: no yaffs2 at 0x{off:x}; findings={got[:6]}")
-    return 1
+    img = os.path.join(work, "oob.yaffs2")
+    page, spare = 2048, 64
+    r = subprocess.run(["mkyaffs2", "-p", str(page), "-s", str(spare), src, img],
+                       capture_output=True)
+    if r.returncode != 0:
+        print("SKIP [yaffs2-dataonly]: mkyaffs2 failed")
+        return 0
+    with open(img, "rb") as f:
+        oob = f.read()
+    # Strip the spare after every page -> a data-only dump (no per-chunk tags).
+    stride = page + spare
+    data = b"".join(oob[i:i + page] for i in range(0, len(oob), stride))
+    off = 1024 * 1024
+    blob = os.path.join(work, "dataonly_fw.bin")
+    with open(blob, "wb") as f:
+        f.write(b"\x00" * off + data + b"\x00" * (256 * 1024))
+    r = subprocess.run([MORIA, "-j", blob], capture_output=True)
+    try:
+        findings = json.loads(r.stdout.decode())["findings"]
+    except Exception:
+        print(f"FAIL [yaffs2-dataonly]: no JSON\n{r.stdout[:200]}")
+        return 1
+    y = [f for f in findings if f["type"] == "yaffs2"]
+    if len(y) != 1:
+        print(f"FAIL [yaffs2-dataonly]: expected 1 yaffs2 region, got {len(y)}")
+        return 1
+    codes = [d["code"] for d in y[0].get("diagnostics", [])]
+    if "yaffs2-no-oob" not in codes:
+        print(f"FAIL [yaffs2-dataonly]: no yaffs2-no-oob diagnostic; got {codes}")
+        return 1
+    # Human rendering: the NOTES tag and the diagnostics section must appear, and
+    # a warning must NOT trip the errors-only top banner.
+    h = subprocess.run([MORIA, "-H", blob], capture_output=True).stdout.decode()
+    if "[warn: no-oob]" not in h or "diagnostics:" not in h:
+        print(f"FAIL [yaffs2-dataonly]: human output missing tag/section")
+        return 1
+    if "error" in h.split("diagnostics:")[0].lower():
+        print(f"FAIL [yaffs2-dataonly]: a warning tripped the errors-only banner")
+        return 1
+    print(f"PASS [yaffs2-dataonly]: 1 region @0x{y[0]['offset']:x}, diagnostic + human rendering")
+    return 0
+
+
+def _extra_header_yaffs2(nfiles=16, with_root=False, erased_tail=0):
+    """Build a minimal YAFFS2 image (2048p/64 OOB, tag_off 2) that uses yaffs2's
+    *extra-header-info* tag encoding: a header chunk stores chunkId with bit 31
+    set and the parent in the low bits, and packs the object type into the top
+    nibble of objectId. Real devices (e.g. Wisenet cameras) write this; a plain
+    mkyaffs2 does not, so it is synthesized here. Layout per file: one header
+    chunk then one data chunk. Returns image bytes."""
+    import struct
+    PAGE, SPARE, TAGOFF, FLAG = 2048, 64, 2, 0x80000000
+    def chunk(data, seq, objid, chunkid, bc):
+        page = data.ljust(PAGE, b"\x00")
+        spare = bytearray(SPARE)
+        struct.pack_into("<IIII", spare, TAGOFF, seq, objid, chunkid, bc)
+        return bytes(page) + bytes(spare)
+    def header(objid, otype, parent, name, size):
+        d = bytearray(PAGE)
+        struct.pack_into("<I", d, 0, otype)          # OH_TYPE
+        struct.pack_into("<I", d, 4, parent)         # OH_PARENT
+        struct.pack_into("<H", d, 8, 0xFFFF)         # deprecated sum
+        nm = name.encode()[:255]
+        d[10:10 + len(nm)] = nm
+        struct.pack_into("<I", d, 268, 0o644)        # OH_MODE
+        struct.pack_into("<I", d, 292, size)         # OH_FILESIZE
+        # tag: type packed into objId top nibble, chunkId = FLAG|parent
+        return chunk(bytes(d), objid, (otype << 28) | objid, FLAG | parent, 0xFFFF)
+    out = bytearray()
+    for i in range(nfiles):
+        oid = 2 + i
+        body = f"contents of file {i}\n".encode()
+        out += header(oid, 1, 1, f"file{i:02d}.txt", len(body))       # TYPE_FILE, parent=root(1)
+        out += chunk(body, oid, oid, 1, len(body))                    # data chunk 1 (no flag)
+    if with_root:
+        # Root directory: object 1, parent 0. Placed mid-stream (as on a real
+        # device, where the anchor lands on a file header and the parent-0 root
+        # appears later in the chunk run — it must not break the run).
+        out += header(1, 3, 0, "", 0)                                 # TYPE_DIR, parent 0
+    out += b"\xff" * (2112 * erased_tail)                             # erased NAND tail
+    return bytes(out)
+
+
+def test_yaffs2_extra_header(work):
+    """A YAFFS2 image using the extra-header-info tag encoding must be identified
+    as an OOB (sized, no `yaffs2-no-oob` diagnostic) region AND extract its files.
+    Regression for header chunks whose stored chunkId is not literally 0.
+    Self-contained. Returns failure count."""
+    img = _extra_header_yaffs2(16)
+    off = 2112 * 512  # a chunk-grid-aligned nonzero offset
+    blob = os.path.join(work, "eh_yaffs2.bin")
+    with open(blob, "wb") as f:
+        # Trailing junk (< one chunk) makes (filesize - off) NOT stride-aligned, so
+        # extraction succeeds only if it bounds to the finding's sized region, not
+        # to EOF (regression for the extractor's even-division gate on the whole file).
+        f.write(b"\x00" * off + img + b"\xab" * 500)
+    r = subprocess.run([MORIA, "-j", blob], capture_output=True)
+    try:
+        findings = json.loads(r.stdout.decode())["findings"]
+    except Exception:
+        print(f"FAIL [yaffs2-extra-header]: no JSON\n{r.stdout[:200]}")
+        return 1
+    y = [f for f in findings if f["type"] == "yaffs2" and f["offset"] == off]
+    if not y:
+        print(f"FAIL [yaffs2-extra-header]: not identified at 0x{off:x}")
+        return 1
+    if any(d["code"] == "yaffs2-no-oob" for d in y[0].get("diagnostics", [])):
+        print(f"FAIL [yaffs2-extra-header]: flagged no-oob despite valid OOB tags")
+        return 1
+    outdir = os.path.join(work, "eh.out")
+    r = subprocess.run([MORIA, "-j", "--extract", "-C", outdir, blob], capture_output=True)
+    try:
+        ex = [e for e in json.loads(r.stdout.decode())["extraction"]["extracted"]
+              if e["type"] == "yaffs2"]
+    except Exception:
+        print(f"FAIL [yaffs2-extra-header]: no extraction manifest\n{r.stdout[:200]}")
+        return 1
+    if not ex or ex[0]["files"] != 16:
+        print(f"FAIL [yaffs2-extra-header]: expected 16 files, got {ex and ex[0].get('files')}")
+        return 1
+    print(f"PASS [yaffs2-extra-header]: identified OOB @0x{off:x}, extracted {ex[0]['files']} files")
+    return 0
+
+
+def test_yaffs2_sparse(work):
+    """A *sparse* extra-header YAFFS2 image — a few files (plus a parent-0 root
+    dir) in a large mostly-erased volume — must still identify as OOB (no
+    no-oob diagnostic) and extract. Regression for the content-run floor being
+    too high for sparse flash and for the parent-0 root breaking the run.
+    The sized region must trim the erased tail. Self-contained."""
+    nfiles, tail = 3, 2000
+    img = _extra_header_yaffs2(nfiles, with_root=True, erased_tail=tail)
+    content_chunks = 1 + nfiles * 2  # root header + (header+data) per file
+    want_size = content_chunks * 2112
+    off = 2112 * 300
+    blob = os.path.join(work, "sparse_yaffs2.bin")
+    with open(blob, "wb") as f:
+        f.write(b"\x00" * off + img)
+    r = subprocess.run([MORIA, "-j", blob], capture_output=True)
+    try:
+        findings = json.loads(r.stdout.decode())["findings"]
+    except Exception:
+        print(f"FAIL [yaffs2-sparse]: no JSON\n{r.stdout[:200]}")
+        return 1
+    y = [f for f in findings if f["type"] == "yaffs2" and f["offset"] == off]
+    if not y:
+        print(f"FAIL [yaffs2-sparse]: not identified at 0x{off:x}")
+        return 1
+    if any(d["code"] == "yaffs2-no-oob" for d in y[0].get("diagnostics", [])):
+        print(f"FAIL [yaffs2-sparse]: sparse OOB image flagged no-oob")
+        return 1
+    if y[0].get("size") != want_size:
+        print(f"FAIL [yaffs2-sparse]: size {y[0].get('size')} != {want_size} (erased tail not trimmed?)")
+        return 1
+    outdir = os.path.join(work, "sparse.out")
+    r = subprocess.run([MORIA, "-j", "--extract", "-C", outdir, blob], capture_output=True)
+    try:
+        ex = [e for e in json.loads(r.stdout.decode())["extraction"]["extracted"]
+              if e["type"] == "yaffs2"]
+    except Exception:
+        print(f"FAIL [yaffs2-sparse]: no extraction manifest")
+        return 1
+    if not ex or ex[0]["files"] != nfiles:
+        print(f"FAIL [yaffs2-sparse]: expected {nfiles} files, got {ex and ex[0].get('files')}")
+        return 1
+    print(f"PASS [yaffs2-sparse]: OOB @0x{off:x}, tail trimmed to {want_size}B, extracted {nfiles} files")
+    return 0
+
+
+def test_verity(work):
+    """A dm-verity superblock must be identified and sized to superblock + full
+    hash tree (computed from data_blocks / block sizes / digest size). Self-
+    contained (no external builder). Returns failure count."""
+    import struct
+    page, ds = 4096, 32           # hash_block_size, sha256 digest
+    data_blocks = 300000
+    # hash tree: ceil-fan-out by (page/ds) per level until one root block.
+    per = page // ds
+    tree, blocks = 0, data_blocks
+    while blocks > 1:
+        blocks = (blocks + per - 1) // per
+        tree += blocks
+    want = (1 + tree) * page      # superblock block + tree
+    sb = bytearray(page)
+    sb[0:8] = b"verity\x00\x00"
+    struct.pack_into("<I", sb, 8, 1)          # version
+    struct.pack_into("<I", sb, 12, 1)         # hash_type
+    sb[32:38] = b"sha256"
+    struct.pack_into("<I", sb, 64, 4096)      # data_block_size
+    struct.pack_into("<I", sb, 68, page)      # hash_block_size
+    struct.pack_into("<Q", sb, 72, data_blocks)
+    struct.pack_into("<H", sb, 80, 32)        # salt_size
+    blob = os.path.join(work, "verity.bin")
+    with open(blob, "wb") as f:
+        f.write(bytes(sb) + b"\x00" * (want + page))  # room so size is not clamped
+    r = subprocess.run([MORIA, "-j", blob], capture_output=True)
+    try:
+        findings = json.loads(r.stdout.decode())["findings"]
+    except Exception:
+        print(f"FAIL [verity]: no JSON\n{r.stdout[:200]}")
+        return 1
+    v = [f for f in findings if f["type"] == "verity"]
+    if len(v) != 1 or v[0]["offset"] != 0:
+        print(f"FAIL [verity]: expected one verity @0, got {[(f['type'], f['offset']) for f in v]}")
+        return 1
+    if v[0].get("size") != want:
+        print(f"FAIL [verity]: size {v[0].get('size')} != computed {want}")
+        return 1
+    if v[0].get("label") != "sha256":
+        print(f"FAIL [verity]: label {v[0].get('label')!r} != 'sha256'")
+        return 1
+    print(f"PASS [verity]: identified, sized {want} B (superblock + hash tree)")
+    return 0
 
 
 def test_cramfs(work, src, expected):
@@ -1362,6 +1600,10 @@ def main():
         failures += test_romfs(work, src, expected)
         failures += test_yaffs2(work, src, expected)
         failures += test_yaffs2_embedded(work, src)
+        failures += test_yaffs2_dataonly(work, src)
+        failures += test_yaffs2_extra_header(work)
+        failures += test_yaffs2_sparse(work)
+        failures += test_verity(work)
         failures += test_cramfs(work, src, expected)
         failures += test_android_sparse(work, src, expected)
         failures += test_erofs(work, src, expected)
