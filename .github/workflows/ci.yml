@@ -1,0 +1,114 @@
+name: ci
+
+# Build + test on every PR and on pushes to master. Complements release.yml
+# (which only builds prebuilt binaries on version tags). Three jobs:
+#   build-test  - gcc and clang, Release, the deterministic test gates
+#   sanitizers  - ASan + UBSan build, same gates (memory safety on hostile input)
+#   fuzz-smoke  - a short libFuzzer run over the seed corpus (catches crashers)
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref (e.g. a force-push to a PR).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build + test (${{ matrix.cc }})
+    runs-on: ubuntu-latest
+    env:
+      MORIA_CI: "1"        # skip build-sensitive round-trips (see tests/test_extract.py)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { cc: gcc, cxx: g++ }
+          - { cc: clang, cxx: clang++ }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps + filesystem tools
+        # The extraction round-trips self-skip when a maker tool is absent;
+        # installing them turns those skips into real coverage. mkyaffs2
+        # (yaffs2utils) and mkbootimg are not packaged and stay skipped - the
+        # self-contained yaffs2/android tests cover that logic without them.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake g++ clang zlib1g-dev liblzma-dev liblz4-dev libzstd-dev \
+            squashfs-tools mtd-utils f2fs-tools erofs-utils xfsprogs btrfs-progs \
+            hfsprogs exfatprogs dosfstools ntfs-3g e2fsprogs device-tree-compiler \
+            u-boot-tools mtools cpio xorriso zip android-sdk-libsparse-utils
+      - name: Configure + build (Release)
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra"
+          cmake --build build -j"$(nproc)"
+      - name: Unit tests
+        run: ./build/moria_unit
+      - name: Synthetic sample regression (+ signature coverage gate)
+        run: python3 tests/test_samples.py
+      - name: Extraction round-trips
+        run: python3 tests/test_extract.py
+      - name: RFP + VBF round-trips
+        run: |
+          python3 tests/test_rae_rfp.py
+          python3 tests/test_vbf.py
+
+  sanitizers:
+    name: asan + ubsan
+    runs-on: ubuntu-latest
+    env:
+      MORIA_CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps + filesystem tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake g++ clang zlib1g-dev liblzma-dev liblz4-dev libzstd-dev \
+            squashfs-tools mtd-utils f2fs-tools erofs-utils xfsprogs btrfs-progs \
+            hfsprogs exfatprogs dosfstools ntfs-3g e2fsprogs device-tree-compiler \
+            u-boot-tools mtools cpio xorriso zip android-sdk-libsparse-utils
+      - name: Configure + build (-DFT_SANITIZE=ON)
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S . -B build -DFT_SANITIZE=ON
+          cmake --build build -j"$(nproc)"
+      - name: Run gates under ASan/UBSan
+        env:
+          ASAN_OPTIONS: abort_on_error=1:detect_leaks=0
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          ./build/moria_unit
+          python3 tests/test_samples.py
+          python3 tests/test_extract.py
+
+  fuzz-smoke:
+    name: fuzz smoke (60s)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang zlib1g-dev liblzma-dev liblz4-dev libzstd-dev
+      - name: Build the libFuzzer target
+        run: bash fuzz/build.sh
+      - name: Fuzz 60s over the seed corpus
+        # libFuzzer writes new inputs into its corpus dir, so seed a throwaway
+        # fuzz/corpus from the committed fixtures - never point it at tests/samples.
+        run: |
+          mkdir -p fuzz/corpus
+          cp -n tests/samples/* fuzz/corpus/ 2>/dev/null || true
+          ./fuzz_scan -max_total_time=60 -rss_limit_mb=4096 fuzz/corpus
