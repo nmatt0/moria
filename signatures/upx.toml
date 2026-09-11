@@ -1,0 +1,27 @@
+name = "upx"
+category = "compression"
+
+# UPX (the Ultimate Packer for eXecutables) packs ELF/PE/Mach-O programs and
+# appends a self-describing "PackHeader" trailer that ends with the "UPX!" magic
+# (55 50 58 21). The same 4 bytes also appear in the loader's internal l_info
+# copy and as an immediate in the decompressor stub, so the magic alone is not
+# enough: the validator parses the trailer and verifies its checksum (a byte sum
+# mod 251, present since UPX version 10), which rejects the non-trailer hits and
+# lifts a genuine match to the verified tier. It reports the target format
+# (ELF/PE/Mach-O + arch), compression method (NRV2B/NRV2D/NRV2E/LZMA), and the
+# original/compressed sizes from the trailer. Detection only; unpacking a UPX
+# stub (reconstructing the original executable) is not yet implemented.
+confidence = "magic"
+
+validator = "upx"
+
+[[magic]]
+hex = "55505821"
+endian = "little"
+
+[doc]
+description = "UPX-packed executable (ELF/PE/Mach-O); UPX! PackHeader trailer, UCL/LZMA-compressed."
+references = [
+  { title = "UPX", url = "https://upx.github.io/" },
+  { title = "UPX PackHeader format (packhead.cpp)", url = "https://github.com/upx/upx/blob/devel/src/packhead.cpp" },
+]

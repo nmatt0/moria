@@ -22,6 +22,7 @@
 #include "deobfuscate/cipher.hpp"
 #include "reader.hpp"
 #include "resolve.hpp"
+#include "validators/upx.hpp"
 
 static int g_checks = 0, g_fails = 0;
 #define CHECK(cond)                                                        \
@@ -390,10 +391,81 @@ static void test_aes() {
           unhex("de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9"));
 }
 
+// Build a little-endian, non-DOS UPX PackHeader trailer (32 bytes) with a valid
+// checksum (sum of bytes[4..30] % 251), so parse_upx_packheader accepts it.
+static std::vector<uint8_t> upx_trailer(uint8_t version, uint8_t format, uint8_t method,
+                                        uint32_t u_len, uint32_t c_len) {
+    std::vector<uint8_t> p(32, 0);
+    p[0] = 'U'; p[1] = 'P'; p[2] = 'X'; p[3] = '!';
+    p[4] = version; p[5] = format; p[6] = method; p[7] = 8;
+    auto le32 = [&](int o, uint32_t v) {
+        p[o] = v & 0xff; p[o + 1] = (v >> 8) & 0xff;
+        p[o + 2] = (v >> 16) & 0xff; p[o + 3] = (v >> 24) & 0xff;
+    };
+    le32(16, u_len); le32(20, c_len); le32(24, u_len);
+    unsigned c = 0;
+    for (int i = 4; i < 31; ++i) c += p[i];
+    p[31] = static_cast<uint8_t>(c % 251);
+    return p;
+}
+
+static void test_upx() {
+    // Valid trailer -> parsed, checksum verified, fields read.
+    auto buf = upx_trailer(14, 22, 14, 0x30000, 0x12000);  // ELF amd64, LZMA
+    ft::Reader r(std::span<const uint8_t>(buf.data(), buf.size()));
+    auto h = ft::parse_upx_packheader(r, 0);
+    CHECK(h && h->checksum_ok);
+    CHECK(h && h->format == 22 && h->method == 14);
+    CHECK(h && h->u_len == 0x30000 && h->c_len == 0x12000 && h->header_size == 32);
+
+    // Corrupt the checksum byte -> rejected (version >= 10 requires it).
+    auto bad = buf; bad[31] ^= 0xff;
+    ft::Reader rb(std::span<const uint8_t>(bad.data(), bad.size()));
+    CHECK(!ft::parse_upx_packheader(rb, 0));
+
+    // Invalid format id -> rejected even with an otherwise sane header.
+    auto badfmt = upx_trailer(14, 6 /*reserved/unimplemented*/, 2, 0x1000, 0x800);
+    ft::Reader rf(std::span<const uint8_t>(badfmt.data(), badfmt.size()));
+    CHECK(!ft::parse_upx_packheader(rf, 0));
+
+    // c_len < 2 is not a real block -> rejected.
+    auto tiny = upx_trailer(14, 22, 2, 0x1000, 1);
+    ft::Reader rt(std::span<const uint8_t>(tiny.data(), tiny.size()));
+    CHECK(!ft::parse_upx_packheader(rt, 0));
+
+    // find_upx_packheader locates a trailer preceded by junk (and an l_info-style
+    // stray "UPX!" that does not checksum as a header).
+    std::vector<uint8_t> emb = {0, 'U', 'P', 'X', '!', 1, 2, 3};  // stray, invalid
+    emb.insert(emb.end(), buf.begin(), buf.end());
+    ft::Reader re(std::span<const uint8_t>(emb.data(), emb.size()));
+    auto found = ft::find_upx_packheader(re, 0, emb.size());
+    CHECK(found && found->magic_off == 8);
+
+    // Method / format name mapping.
+    CHECK(std::string(ft::upx_method_name(2)) == "NRV2B");
+    CHECK(std::string(ft::upx_method_name(5)) == "NRV2D");
+    CHECK(std::string(ft::upx_method_name(8)) == "NRV2E");
+    CHECK(std::string(ft::upx_method_name(14)) == "LZMA");
+    CHECK(ft::upx_method_name(99) == nullptr);
+    std::string fam, arch;
+    ft::upx_format_desc(22, fam, arch);
+    CHECK(fam == "ELF" && arch == "amd64");
+    ft::upx_format_desc(36, fam, arch);
+    CHECK(fam == "PE" && arch == "amd64");
+
+    // ident + release parsing.
+    std::string banner = "$Id: UPX 3.96 Copyright (C) the UPX Team $";
+    std::vector<uint8_t> id(banner.begin(), banner.end());
+    ft::Reader ri(std::span<const uint8_t>(id.data(), id.size()));
+    CHECK(ft::has_upx_ident(ri, 0, id.size()));
+    CHECK(ft::upx_release_from_ident(ri, 0, id.size()) == "3.96");
+}
+
 int main() {
     test_expr();
     test_layout();
     test_resolve();
+    test_upx();
     test_ahocorasick();
     test_crc32();
     test_entropy();
