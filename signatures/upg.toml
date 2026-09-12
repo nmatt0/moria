@@ -1,0 +1,38 @@
+name = "upg"
+category = "firmware"
+
+# ".upg" firmware update container. Fixed 56-byte binary header, then a payload,
+# then a 16-byte trailer (both unidentified purpose): header_length + payload_size
+# + 16 == exact file size on every real-world sample seen, which is the
+# validator's main check. The payload opens with a 16-byte opaque prefix (differs
+# per file — nonce or digest, undetermined) then a constant 8-byte tag (meaning
+# unknown, byte-identical across every sample seen), then a NUL-padded ASCII
+# label (component/device name, e.g. a bootloader stage name) at payload offset
+# 0x18. The bulk of the payload beyond that label is high-entropy with no
+# recognized internal structure — likely encrypted, though no key material has
+# been located to confirm or decode it.
+struct = """
+  bytes[4] magic;
+  u32 reserved;
+  u32 payload_size;
+  u16 format_version;
+  u16 header_length;
+"""
+
+constraints = [
+  "format_version == 1",
+  "header_length == 0x38",
+]
+
+validator = "upg"   # confirms header_length + payload_size + 16 == EOF; pulls the embedded label
+
+[[magic]]
+hex = "fc555048"
+endian = "little"
+
+[doc]
+description = "\".upg\" firmware update container: 56-byte header + payload + 16-byte trailer, size-verified against EOF. Payload carries a short plaintext label then a large high-entropy (likely encrypted) region of unconfirmed structure."
+limitations = [
+  "Header bytes 0x10-0x37 and the 16-byte trailer are unidentified — no spec or reference implementation available.",
+  "No decryption key found in any analyzed companion software; the bulk of the payload cannot be decoded, only located.",
+]

@@ -1029,6 +1029,24 @@ def vbf():
     return hdr + block(0x00FD0000, b0) + block(0x10000400, b1)
 
 
+def upg():
+    # ".upg" firmware container: 56-byte header (magic, reserved, payload_size,
+    # format_version=1, header_length=0x38, padding) then a payload (16-byte
+    # opaque prefix + constant 8-byte tag + NUL-padded ASCII label + filler)
+    # then a 16-byte trailer. header_length + payload_size + 16 landing exactly
+    # on EOF -> verified.
+    payload = (bytes((i * 31 + 7) & 0xFF for i in range(16)) +   # opaque prefix
+               bytes.fromhex("0100140102000000") +                # observed-constant tag
+               b"TESTBOOT" + bytes(8) +                           # NUL-padded label
+               bytes((i * 197 + 13) & 0xFF for i in range(256)))  # filler
+    header = (b"\xFCUPH" + b"\xFF\xFF\xFF\xFF" +
+              struct.pack("<I", len(payload)) +
+              struct.pack("<HH", 1, 0x38) +
+              bytes(0x38 - 16))
+    trailer = bytes((i * 53 + 1) & 0xFF for i in range(16))
+    return header + payload + trailer
+
+
 def random_blob():
     # deterministic pseudo-random, no known magic
     return bytes((i * 37 + 11) & 0xFF for i in range(2048))
@@ -1491,6 +1509,7 @@ MANIFEST = [
     ("installer.msi", cfbf, "cfbf", VERIFIED),
     ("default.hv", wince_hive, "wince_hive", CONSISTENT),
     ("fw.vbf", vbf, "vbf", VERIFIED),
+    ("fw.upg", upg, "upg", VERIFIED),
     ("android_magic_string.bin", android_magic_string, None, 0),
     ("android_magic_at_zero.bin", android_magic_at_zero, None, 0),
     ("jpeg_fp_soi.bin", jpeg_fp_soi, None, 0),
