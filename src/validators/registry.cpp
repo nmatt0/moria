@@ -11,10 +11,13 @@
 #include "validators/rae_rfp.hpp"
 #include "validators/squashfs.hpp"
 #include "validators/tar.hpp"
+#include "validators/uboot_env.hpp"
 #include "validators/ubi.hpp"
+#include "validators/uefi_fv.hpp"
 #include "validators/uimage.hpp"
 #include "validators/upx.hpp"
 #include "validators/vbf.hpp"
+#include "validators/vbmeta.hpp"
 #include "validators/verity.hpp"
 #include "validators/yaffs2.hpp"
 #include "validators/zip.hpp"
@@ -39,6 +42,9 @@ Validator find_validator(const std::string& name) {
     if (name == "vbf") return validate_vbf;
     if (name == "upx") return validate_upx;
     if (name == "verity") return validate_verity;
+    if (name == "vbmeta") return validate_vbmeta;
+    if (name == "uefi_fv") return validate_uefi_fv;
+    if (name == "uboot_env") return validate_uboot_env;
     if (name == "ubi") return validate_ubi;
     if (name == "ubifs") return validate_ubifs;
     return nullptr;

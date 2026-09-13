@@ -61,9 +61,11 @@ add_executable(moria
   src/extract/ntfs.cpp
   src/extract/iso9660.cpp
   src/extract/uimage.cpp
+  src/extract/uboot_env.cpp
   src/extract/rae_rfp.cpp
   src/extract/lzari.cpp
   src/extract/vbf.cpp
+  src/extract/vbmeta.cpp
   src/extract/lzss.cpp
   src/extract/ucl.cpp
   src/extract/upx_filter.cpp
@@ -108,6 +110,9 @@ add_executable(moria
   src/validators/rae_rfp.cpp
   src/validators/vbf.cpp
   src/validators/verity.cpp
+  src/validators/vbmeta.cpp
+  src/validators/uefi_fv.cpp
+  src/validators/uboot_env.cpp
   src/validators/tar.cpp
   src/validators/ubi.cpp
   src/validators/dtb.cpp

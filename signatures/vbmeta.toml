@@ -1,0 +1,59 @@
+# NOTE: all root-level keys must precede the first [[magic]] / [doc] table.
+name = "vbmeta"
+category = "bootloader"
+
+# Android Verified Boot (AVB) vbmeta image. The 256-byte AvbVBMetaImageHeader
+# (libavb, all big-endian) is followed by an authentication block then an
+# auxiliary block. We parse the header fields we need for sizing + consistency;
+# the validator confirms the sub-block offsets fit and reads the release string.
+# Interpretation of the flags (verification disabled), the signing key, and the
+# descriptors (hashtree / chain-partition / kernel cmdline) belongs to mithril.
+struct = """
+  bytes[4] magic;
+  u32 avb_major;
+  u32 avb_minor;
+  u64 auth_block_size;
+  u64 aux_block_size;
+  u32 algorithm_type;
+  u64 hash_offset;
+  u64 hash_size;
+  u64 signature_offset;
+  u64 signature_size;
+  u64 public_key_offset;
+  u64 public_key_size;
+  u64 public_key_metadata_offset;
+  u64 public_key_metadata_size;
+  u64 descriptors_offset;
+  u64 descriptors_size;
+  u64 rollback_index;
+  u32 flags;
+  u32 rollback_index_location;
+"""
+
+constraints = [
+  "avb_major <= 10",
+  "algorithm_type <= 6",
+  "auth_block_size <= 16777216",
+  "aux_block_size <= 16777216",
+  "auth_block_size % 8 == 0",
+  "aux_block_size % 8 == 0",
+]
+
+# header (256) + authentication block + auxiliary block.
+size = "256 + auth_block_size + aux_block_size"
+size_clamp = true
+
+# Confirms the auth/aux sub-block offsets fit, reads release_string + algorithm,
+# and sizes the finding to header + auth + aux.
+validator = "vbmeta"
+
+[[magic]]
+hex = "41564230"   # "AVB0"
+endian = "big"
+
+[doc]
+description = "Android Verified Boot (AVB) vbmeta image: the signed root of trust that authenticates boot/system/vendor and carries the dm-verity descriptors, chained partitions, rollback index, and verified-boot flags. mithril interprets the verification posture and signing key."
+references = [
+  { title = "AVB vbmeta format (libavb)", url = "https://android.googlesource.com/platform/external/avb/+/master/libavb/avb_vbmeta_image.h" },
+  { title = "Android Verified Boot 2.0", url = "https://android.googlesource.com/platform/external/avb/+/master/README.md" },
+]

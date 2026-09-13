@@ -66,6 +66,9 @@ inline const char* mime_for_type(const std::string& t) {
     if (t == "fit") return "application/x-flat-image-tree";
     if (t == "dtb") return "application/x-dtb";
     if (t == "uboot") return "application/x-uboot";
+    if (t == "uboot_env") return "application/x-uboot-env";
+    if (t == "vbmeta") return "application/x-avb-vbmeta";
+    if (t == "uefi_fv") return "application/x-uefi-firmware-volume";
     if (t == "lk") return "application/x-lk-bootloader";
     return "application/octet-stream";
 }

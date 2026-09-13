@@ -260,6 +260,56 @@ def uimage():
     return hdr + b"\0" * 16                                              # + 16 bytes payload (ih_size)
 
 
+def uboot_env():
+    # U-Boot single environment: u32 crc32(data) + data, where data is a
+    # NUL-separated key=value list ending in an empty entry, padded to ENV_SIZE.
+    size = 0x2000
+    vars = [b"bootcmd=bootm 0x82000000", b"bootargs=console=ttyS0,115200",
+            b"baudrate=115200", b"ethaddr=00:11:22:33:44:55", b"ipaddr=10.0.0.1"]
+    data = b"\x00".join(vars) + b"\x00\x00"
+    data = data.ljust(size - 4, b"\x00")[:size - 4]
+    crc = zlib.crc32(data) & 0xFFFFFFFF
+    return struct.pack("<I", crc) + data
+
+
+def vbmeta():
+    # Minimal AVB vbmeta: the 256-byte AvbVBMetaImageHeader (big-endian), no
+    # authentication/auxiliary blocks (unsigned/verification-off form). All
+    # offsets zero -> the validator's within() checks pass -> consistent.
+    hdr = struct.pack(
+        ">4sIIQQIQQQQQQQQQQQII48s80s",
+        b"AVB0", 1, 0,       # magic, avb_major, avb_minor
+        0, 0,               # auth_block_size, aux_block_size
+        0,                  # algorithm_type (NONE)
+        0, 0, 0, 0,         # hash/signature offset+size
+        0, 0, 0, 0,         # public_key + metadata offset+size
+        0, 0,               # descriptors offset+size
+        0,                  # rollback_index
+        0, 0,               # flags, rollback_index_location
+        b"avbtool 1.2.0", b"")
+    assert len(hdr) == 256
+    return hdr
+
+
+def uefi_fv():
+    # UEFI Firmware Volume header (EFI_FIRMWARE_VOLUME_HEADER), 72-byte header.
+    # The 16-bit header checksum makes the sum of all header UINT16 words zero.
+    hlen = 0x48
+    fvlen = 0x1000
+    hdr = bytearray(hlen)
+    hdr[16:32] = bytes([0x78, 0xE5, 0x8C, 0x8C, 0x3D, 0x8A, 0x1C, 0x4F,
+                        0x99, 0x35, 0x89, 0x61, 0x85, 0xC3, 0x2D, 0xD3])  # FFS2 GUID
+    struct.pack_into("<Q", hdr, 32, fvlen)
+    hdr[40:44] = b"_FVH"
+    struct.pack_into("<I", hdr, 44, 0x000004FE)  # attributes
+    struct.pack_into("<H", hdr, 48, hlen)        # header_length
+    hdr[54] = 0
+    hdr[55] = 2                                   # revision
+    s = sum(struct.unpack_from("<%dH" % (hlen // 2), hdr))
+    struct.pack_into("<H", hdr, 50, (-s) & 0xFFFF)  # checksum -> total sum 0
+    return bytes(hdr) + b"\xff" * (fvlen - hlen)
+
+
 def gzip():
     return bytes([0x1F, 0x8B, 0x08, 0x00]) + struct.pack("<I", 0) + bytes([0x00, 0x03]) + b"\0" * 16
 
@@ -723,6 +773,9 @@ MANIFEST = [
     ("pieeprom.bin", rpi_eeprom, "rpi_eeprom", STRUCTURAL),
     ("aboot.lk", lk_image, "lk", MAGIC),
     ("u-boot.bin", uboot, "uboot", MAGIC),
+    ("uboot.env", uboot_env, "uboot_env", VERIFIED),
+    ("vbmeta.img", vbmeta, "vbmeta", CONSISTENT),
+    ("firmware.fv", uefi_fv, "uefi_fv", VERIFIED),
     ("rootfs.yaffs2", yaffs2, "yaffs2", STRUCTURAL),
     ("rootfs_be.yaffs2", yaffs2_be, "yaffs2", STRUCTURAL),
     ("hashtree.verity", verity, "verity", CONSISTENT),

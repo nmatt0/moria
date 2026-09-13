@@ -1,0 +1,44 @@
+name = "uboot_env"
+category = "bootloader"
+
+# The U-Boot environment has no format magic: it is a 4-byte CRC32 (LE) header
+# (optionally + a 1-byte redundant-copy flag) followed by a NUL-separated
+# `key=value` list ending in an empty entry, then padding to the fixed env size.
+# There is nothing constant to match at the block start, so anchor on the
+# NUL-prefixed common variable assignments that appear at entry boundaries inside
+# the list. The leading NUL is the guard: a `\0key=` byte string can only occur
+# at a true entry boundary (values never contain NUL), so these never fire inside
+# arbitrary text. The validator walks back to the block header, walks the entry
+# list, and recomputes the CRC32 over candidate env sizes to lift a real match to
+# `verified` (and recover the exact block size).
+magic_offset = 0
+validator = "uboot_env"
+
+# Common env variables, each prefixed with the NUL that separates it from the
+# preceding entry. At least one non-first entry matches in any real environment.
+[[magic]]
+hex = "00626f6f74636d643d"       # \0bootcmd=
+[[magic]]
+hex = "00626f6f74617267733d"     # \0bootargs=
+[[magic]]
+hex = "0062617564726174653d"     # \0baudrate=
+[[magic]]
+hex = "00626f6f7464656c61793d"   # \0bootdelay=
+[[magic]]
+hex = "00657468616464723d"       # \0ethaddr=
+[[magic]]
+hex = "006970616464723d"         # \0ipaddr=
+[[magic]]
+hex = "00737464696e3d"           # \0stdin=
+[[magic]]
+hex = "007374646f75743d"         # \0stdout=
+[[magic]]
+hex = "0073657276657269703d"     # \0serverip=
+[[magic]]
+hex = "00626f6f7466696c653d"     # \0bootfile=
+
+[doc]
+description = "Das U-Boot environment block (CRC32 header + NUL-separated key=value list). One of the highest-value structural artifacts in a firmware image; interpretation of its contents (credentials, network config, boot args) belongs to mithril."
+references = [
+  { title = "U-Boot environment (env/)", url = "https://docs.u-boot.org/en/latest/develop/environment.html" },
+]
