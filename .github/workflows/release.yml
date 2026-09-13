@@ -96,7 +96,7 @@ jobs:
       - name: Install packaging toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y debhelper dpkg-dev cmake g++ lintian \
+          sudo apt-get install -y build-essential debhelper dpkg-dev cmake lintian \
             zlib1g-dev liblzma-dev liblz4-dev libzstd-dev
 
       - name: Build .deb
