@@ -60,5 +60,6 @@ License: BSD-2-Clause-file
  OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  EXEMPLARY, OR CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF
  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-Comment: The file(1) license. See THIRD_PARTY.md in the source tree for the
- full provenance of the derived signature sets.
+Comment: The file(1) license, covering the general signature set derived from
+ file(1)'s Magdir. The firmware signature set's descriptions are original
+ clean-room prose (byte patterns and offsets are facts about the formats).

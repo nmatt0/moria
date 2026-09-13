@@ -1,7 +1,7 @@
 # Firmware-vendor magic-tier signatures for moria.
 # Byte patterns and offsets are facts about real firmware formats.
 # Descriptions are original (name + identifying magic + offset); no
-# third-party prose is reproduced. See THIRD_PARTY.md for provenance.
+# third-party prose is reproduced.
 
 [[signature]]
 name = "dahua_firmware_image"

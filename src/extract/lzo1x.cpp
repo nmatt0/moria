@@ -1,7 +1,7 @@
 // lzo1x.cpp — internal LZO1X-safe decompressor. See lzo1x.hpp.
 //
-// Clean-room implementation of the public LZO1X decompression algorithm (no
-// third-party/GPL code). Distances are computed as integers and validated
+// Internal implementation of the public LZO1X decompression algorithm (no
+// third-party code). Distances are computed as integers and validated
 // against the amount already written before any source pointer is formed, so no
 // out-of-bounds pointer arithmetic occurs even on a hostile stream. Match copies
 // are byte-by-byte because source and destination may overlap by one byte.

@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "extract/lzo1x.hpp"  // internal LZO1X (MIT); no GPL liblzo2 dependency
+#include "extract/lzo1x.hpp"  // internal LZO1X decompressor
 
 #ifdef MORIA_HAVE_ZLIB
 #include <zlib.h>
