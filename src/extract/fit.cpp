@@ -111,6 +111,22 @@ struct Sub {
     uint64_t ext_pos = 0;  // `data-position` (absolute from FIT start)
     bool has_ext_size = false;
     uint64_t ext_size = 0;  // `data-size`
+    // Verified-boot metadata (from the subimage's hash-*/signature-* subnodes).
+    std::string hash_algo;
+    std::string sig_algo;
+};
+
+// A collected /configurations/<conf> node.
+struct Cfg {
+    std::string name, kernel, fdt, sign_images, sig_algo, required;
+    bool has_sig = false;
+};
+
+// A collected /signature/key-<name> public-key node.
+struct Key {
+    std::string name, hint, algo, required, num_bits;
+    uint64_t n_off = 0, n_len = 0;  // rsa,n (modulus) value bytes (absolute)
+    uint64_t e_off = 0, e_len = 0;  // rsa,e (exponent)
 };
 
 Compressor comp_of(const std::string& c) {
@@ -176,6 +192,77 @@ void emit_sub(const Reader& r, uint64_t fit_off, const Fdt& fdt, const Sub& s, S
         out.bytes += data.size();
     } else {
         out.warnings.push_back("write failed: " + s.name);
+    }
+}
+
+bool starts_with(const std::string& s, const char* pre) {
+    return s.rfind(pre, 0) == 0;
+}
+
+// Write the FIT verified-boot structure as a human-readable sidecar and carve
+// the embedded signing keys, so `moria -e` records the signing posture and the
+// key material for a downstream fingerprinting/interpretation pass (mithril).
+// Structural only: it serializes the tree's signature nodes, it does not judge
+// them. Called only when the FIT actually carries signature/key nodes.
+void write_fit_metadata(const Reader& r, const std::vector<Sub>& subs, const std::vector<Cfg>& cfgs,
+                        const std::vector<Key>& keys, SafeRoot& root, const std::string& subdir,
+                        Extracted& out) {
+    std::string t = "FIT verified-boot structure\n\n";
+    if (!subs.empty()) {
+        t += "images:\n";
+        for (const auto& s : subs) {
+            t += "  " + s.name + "  type=" + (s.type.empty() ? "?" : s.type) + " comp=" + s.comp;
+            if (!s.hash_algo.empty()) t += "  hash=" + s.hash_algo;
+            if (!s.sig_algo.empty()) t += "  signature=" + s.sig_algo;
+            t += "\n";
+        }
+    }
+    if (!cfgs.empty()) {
+        t += "configurations:\n";
+        for (const auto& c : cfgs) {
+            t += "  " + c.name;
+            if (!c.kernel.empty()) t += "  kernel=" + c.kernel;
+            if (!c.fdt.empty()) t += "  fdt=" + c.fdt;
+            if (!c.sign_images.empty()) t += "  sign-images=" + c.sign_images;
+            if (c.has_sig) t += "  signature=" + (c.sig_algo.empty() ? "yes" : c.sig_algo);
+            if (!c.required.empty()) t += "  required=" + c.required;
+            t += "\n";
+        }
+    }
+    if (!keys.empty()) {
+        t += "keys:\n";
+        for (const auto& k : keys) {
+            t += "  " + k.name;
+            if (!k.hint.empty()) t += "  hint=" + k.hint;
+            if (!k.algo.empty()) t += "  algo=" + k.algo;
+            if (!k.num_bits.empty()) t += "  rsa-bits=" + k.num_bits;
+            if (!k.required.empty()) t += "  required=" + k.required;
+            t += "\n";
+        }
+    }
+    std::vector<uint8_t> tb(t.begin(), t.end());
+    if (root.write_file(subdir + "/fit-signature-info.txt", tb, 0644)) {
+        out.files++;
+        out.bytes += tb.size();
+    }
+    // Carve each key's public material (modulus + exponent) for fingerprinting.
+    for (const auto& k : keys) {
+        if (k.n_len == 0) continue;
+        std::vector<uint8_t> key;
+        if (auto n = r.bytes(static_cast<size_t>(k.n_off), static_cast<size_t>(k.n_len)))
+            key.insert(key.end(), n->begin(), n->end());
+        if (k.e_len && k.e_len < 64) {
+            if (auto e = r.bytes(static_cast<size_t>(k.e_off), static_cast<size_t>(k.e_len)))
+                key.insert(key.end(), e->begin(), e->end());
+        }
+        if (key.empty()) continue;
+        std::string safe = k.name.empty() ? "key" : k.name;
+        for (char& c : safe)
+            if (c == '/' || c == '\\') c = '_';
+        if (root.write_file(subdir + "/fit-keys/" + safe + ".bin", key, 0644)) {
+            out.files++;
+            out.bytes += key.size();
+        }
     }
 }
 
@@ -273,6 +360,12 @@ bool extract_fit(const Reader& r, const Finding& f, SafeRoot& root, const std::s
     Sub cur;
     bool in_sub = false;  // currently inside a /images/<name> node
     size_t subs = 0;
+    // Verified-boot metadata collected alongside the payloads.
+    std::vector<Sub> submetas;
+    std::vector<Cfg> cfgs;
+    std::vector<Key> keys;
+    Cfg cur_cfg;
+    Key cur_key;
 
     for (size_t i = 0; i < MAX_TOKENS && pos + 4 <= fdt.struct_end; ++i) {
         auto tok = be32(r, pos);
@@ -283,23 +376,39 @@ bool extract_fit(const Reader& r, const Finding& f, SafeRoot& root, const std::s
             std::string name = read_cstr(r, pos, fdt.struct_end, next);
             pos = align4(next);
             path.push_back(name);
-            // A subimage node is a direct child of the root's `images` node:
-            // path == ["", "images", "<name>"].
-            if (path.size() == 3 && path[1] == "images") {
+            const size_t d = path.size();
+            // A subimage node is a direct child of the root's `images` node.
+            if (d == 3 && path[1] == "images") {
                 if (subs++ >= MAX_SUBIMAGES) { truncated = true; break; }
                 cur = Sub{};
                 cur.name = name;
                 in_sub = true;
-            } else if (path.size() > 3) {
+            } else if (d == 3 && path[1] == "configurations") {
+                cur_cfg = Cfg{};
+                cur_cfg.name = name;
+            } else if (d == 3 && path[1] == "signature" && starts_with(name, "key")) {
+                cur_key = Key{};
+                cur_key.name = name;
+            } else if (d > 3) {
                 in_sub = false;  // e.g. a hash-1 subnode inside a subimage
             }
         } else if (*tok == FDT_END_NODE) {
             if (path.empty()) { truncated = true; break; }
-            const bool closing_sub = (path.size() == 3 && path[1] == "images");
+            const size_t d = path.size();
+            const bool closing_sub = (d == 3 && path[1] == "images");
+            const bool closing_cfg = (d == 3 && path[1] == "configurations");
+            const bool closing_key = (d == 3 && path[1] == "signature" && starts_with(path[2], "key"));
             path.pop_back();
             if (closing_sub) {
+                submetas.push_back(cur);
                 emit_sub(r, f.offset, fdt, cur, root, subdir, out);
                 cur = Sub{};
+            } else if (closing_cfg) {
+                cfgs.push_back(cur_cfg);
+                cur_cfg = Cfg{};
+            } else if (closing_key) {
+                keys.push_back(cur_key);
+                cur_key = Key{};
             }
             in_sub = (path.size() == 3 && path[1] == "images");
         } else if (*tok == FDT_PROP) {
@@ -308,10 +417,11 @@ bool extract_fit(const Reader& r, const Finding& f, SafeRoot& root, const std::s
             if (!len || !nameoff) { truncated = true; break; }
             const uint64_t vpos = pos + 8;  // value bytes start here
             pos = vpos + align4(*len);
+            uint64_t dummy = 0;
+            std::string pname = read_cstr(r, fdt.strings_off + *nameoff, fdt.strings_end, dummy);
+            auto sval = [&]() { uint64_t d = 0; return read_cstr(r, vpos, vpos + *len, d); };
+            const size_t d = path.size();
             if (in_sub) {
-                uint64_t dummy = 0;
-                std::string pname =
-                    read_cstr(r, fdt.strings_off + *nameoff, fdt.strings_end, dummy);
                 if (pname == "data") {
                     cur.has_data = true;
                     cur.data_off = vpos;
@@ -323,11 +433,35 @@ bool extract_fit(const Reader& r, const Finding& f, SafeRoot& root, const std::s
                 } else if (pname == "data-position") {
                     if (auto v = be32(r, vpos)) { cur.has_ext_pos = true; cur.ext_pos = *v; }
                 } else if (pname == "compression") {
-                    uint64_t d = 0;
-                    cur.comp = read_cstr(r, vpos, vpos + *len, d);
+                    cur.comp = sval();
                 } else if (pname == "type") {
-                    uint64_t d = 0;
-                    cur.type = read_cstr(r, vpos, vpos + *len, d);
+                    cur.type = sval();
+                }
+            } else if (d == 4 && path[1] == "images" && pname == "algo") {
+                // a hash-*/signature-* subnode of the subimage (cur still refers to it)
+                if (starts_with(path[3], "signature")) cur.sig_algo = sval();
+                else if (starts_with(path[3], "hash")) cur.hash_algo = sval();
+            } else if (d == 3 && path[1] == "configurations") {
+                if (pname == "kernel") cur_cfg.kernel = sval();
+                else if (pname == "fdt") cur_cfg.fdt = sval();
+                else if (pname == "sign-images") cur_cfg.sign_images = sval();
+            } else if (d == 4 && path[1] == "configurations" && starts_with(path[3], "signature")) {
+                cur_cfg.has_sig = true;
+                if (pname == "algo") cur_cfg.sig_algo = sval();
+                else if (pname == "sign-images") cur_cfg.sign_images = sval();
+                else if (pname == "required") cur_cfg.required = sval();
+            } else if (d == 3 && path[1] == "signature" && starts_with(path[2], "key")) {
+                if (pname == "key-name-hint") cur_key.hint = sval();
+                else if (pname == "algo") cur_key.algo = sval();
+                else if (pname == "required") cur_key.required = sval();
+                else if (pname == "rsa,num-bits") {
+                    if (auto v = be32(r, vpos)) cur_key.num_bits = std::to_string(*v);
+                } else if (pname == "rsa,n") {
+                    cur_key.n_off = vpos;
+                    cur_key.n_len = *len;
+                } else if (pname == "rsa,e") {
+                    cur_key.e_off = vpos;
+                    cur_key.e_len = *len;
                 }
             }
         } else if (*tok == FDT_NOP) {
@@ -345,6 +479,14 @@ bool extract_fit(const Reader& r, const Finding& f, SafeRoot& root, const std::s
     // current subimage's payload was already parsed before the break. Emit it so
     // we recover the kernel/ramdisk rather than returning nothing.
     if (truncated && (cur.has_data || cur.has_ext_size)) emit_sub(r, f.offset, fdt, cur, root, subdir, out);
+
+    // Record the verified-boot structure + carve the signing keys, when present.
+    bool any_sig = !keys.empty();
+    for (const auto& s : submetas)
+        if (!s.sig_algo.empty()) any_sig = true;
+    for (const auto& c : cfgs)
+        if (c.has_sig) any_sig = true;
+    if (any_sig) write_fit_metadata(r, submetas, cfgs, keys, root, subdir, out);
 
     // Record the byte span this FIT occupied (tree + any external data), so a
     // recursive pass and the manifest know what the finding consumed.

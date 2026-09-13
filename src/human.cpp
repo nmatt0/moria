@@ -67,13 +67,14 @@ std::string hex_off(size_t o) {
     return buf;
 }
 
-// Printable, length-capped, control-stripped rendering of an embedded label.
-std::string clean_label(const std::string& s, size_t cap = 40) {
+// Printable, control-stripped rendering of an embedded label. Capped with an
+// ellipsis unless `verbose` (the -v flag) asks for the full value.
+std::string clean_label(const std::string& s, size_t cap = 40, bool verbose = false) {
     std::string out;
     for (char c : s) {
         unsigned char u = static_cast<unsigned char>(c);
         out += (u >= 0x20 && u < 0x7f) ? c : '.';
-        if (out.size() >= cap) {
+        if (!verbose && out.size() >= cap) {
             out += "…";  // ellipsis
             break;
         }
@@ -85,7 +86,7 @@ std::string clean_label(const std::string& s, size_t cap = 40) {
 // The caller renders the whole string dim; diagnostic tags are re-colored by
 // severity (a warning is yellow) so they catch the eye down the NOTES column
 // while the rest stays faint. Tags come last, so the color escapes don't bleed.
-std::string notes_for(const Finding& f, const Palette& p) {
+std::string notes_for(const Finding& f, const Palette& p, bool verbose = false) {
     std::vector<std::string> parts;
     std::string ev = endian_name(f.endian);
     if (!f.arch.empty()) ev += "/" + f.arch;
@@ -97,7 +98,8 @@ std::string notes_for(const Finding& f, const Palette& p) {
         parts.push_back(std::to_string(f.members.size()) + (f.members_truncated ? "+ members" : " members"));
     std::string s;
     for (size_t i = 0; i < parts.size(); ++i) s += (i ? " " : "") + parts[i];
-    if (!f.label.empty()) s += (s.empty() ? "" : "  ") + ("\"" + clean_label(f.label) + "\"");
+    if (!f.label.empty())
+        s += (s.empty() ? "" : "  ") + ("\"" + clean_label(f.label, 40, verbose) + "\"");
     // Terse per-finding diagnostic tags, e.g. "[warn: no-oob]". The short tag is
     // the code with a redundant leading "<type>-" stripped; the full message is
     // in the diagnostics section.
@@ -137,7 +139,7 @@ bool keep_expanded(const Finding& f) {
 // it with tree connectors, recursively. Collapses per-parent swarms. Columns
 // (SIZE/TYPE/TIER/NOTES) stay aligned; the tree glyphs live in the OFFSET column.
 void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Finding>& fs,
-                        bool all) {
+                        bool all, bool verbose = false) {
     const size_t n = fs.size();
     auto is_container = [](const Finding& f) {
         return f.category == "filesystem" || f.category == "container";
@@ -326,7 +328,7 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
         line += "  ";
         col(line, r.f->confidence_tier, w_tier, p.tier(r.f->confidence_tier), p.reset());
         line += "  ";
-        line += p.dim() + notes_for(*r.f, p) + p.reset();
+        line += p.dim() + notes_for(*r.f, p, verbose) + p.reset();
         while (!line.empty() && line.back() == ' ') line.pop_back();
         o += line + "\n";
     }
@@ -389,7 +391,7 @@ void emit_diagnostics_section(std::string& o, const Palette& p, const std::vecto
 
 std::string emit_file_human(const std::vector<Finding>& findings,
                             const std::vector<Region>& regions, const std::string& footer,
-                            bool color, bool all) {
+                            bool color, bool all, bool verbose) {
     Palette p{color};
     std::string o;
 
@@ -412,7 +414,7 @@ std::string emit_file_human(const std::vector<Finding>& findings,
         o += "No known structures identified.\n";
         o += p.reset();
     } else {
-        emit_findings_tree(o, p, findings, all);
+        emit_findings_tree(o, p, findings, all, verbose);
     }
 
     // What's wrong with what's here — after the table, before the regions/footer.
@@ -446,7 +448,8 @@ static std::pair<std::string, std::string> split_dir(const std::string& path) {
     return {path.substr(0, slash + 1), path.substr(slash + 1)};
 }
 
-std::string emit_tree_human(const TreeResult& tr, const std::string& footer, bool color, bool all) {
+std::string emit_tree_human(const TreeResult& tr, const std::string& footer, bool color, bool all,
+                            bool verbose) {
     Palette p{color};
     std::string o;
 
@@ -487,7 +490,7 @@ std::string emit_tree_human(const TreeResult& tr, const std::string& footer, boo
                 cur_dir = dir;
                 o += "  " + std::string(p.dim()) + dir + p.reset() + "\n";
             }
-            if (base.size() > 52) base = "…" + base.substr(base.size() - 51);
+            if (!verbose && base.size() > 52) base = "…" + base.substr(base.size() - 51);
             std::string row = "    ";
             col(row, base, w_base, "", "");
             row += "  ";
@@ -498,7 +501,7 @@ std::string emit_tree_human(const TreeResult& tr, const std::string& footer, boo
             col(row, n.finding.type, w_type, tc, p.reset());
             row += "  ";
             row += p.dim();
-            row += notes_for(n.finding, p);
+            row += notes_for(n.finding, p, verbose);
             row += p.reset();
             while (!row.empty() && row.back() == ' ') row.pop_back();
             o += row + "\n";

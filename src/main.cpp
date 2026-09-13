@@ -123,6 +123,7 @@ void print_help(std::FILE* out, const char* prog, bool color) {
                  "  -c, --carve         Carve raw byte ranges to <file>.carved/, no parsing\n"
                  "  -A, --all           Show findings inside containers/filesystems (default: hidden)\n"
                  "  -E, --entropy       Entropy analysis: unidentified regions + encryption hints\n"
+                 "  -v, --verbose       Show full labels in human output (no \"…\" truncation)\n"
                  "      --broad         Also match ~2500 general (non-firmware) formats\n"
                  "      --list          List archive contents without extracting\n"
                  "  -C, --outdir <DIR>  Output directory for -e / -c\n"
@@ -382,6 +383,7 @@ int main(int argc, char** argv) {
     bool broad = false;
     bool json_out = false;  // default is the human-readable view
     bool show_all = false;  // -A: don't collapse compressed-stream swarms
+    bool verbose = false;   // -v: show full labels (no ellipsis truncation)
     bool entropy = false;   // -E: entropy analysis (unidentified regions + hints)
     bool list = false;
     bool extract = false;
@@ -422,6 +424,8 @@ int main(int argc, char** argv) {
             json_out = true;
         } else if (!end_of_opts && (std::strcmp(a, "--all") == 0 || std::strcmp(a, "-A") == 0)) {
             show_all = true;
+        } else if (!end_of_opts && (std::strcmp(a, "--verbose") == 0 || std::strcmp(a, "-v") == 0)) {
+            verbose = true;
         } else if (!end_of_opts && (std::strcmp(a, "--entropy") == 0 || std::strcmp(a, "-E") == 0)) {
             entropy = true;
         } else if (!end_of_opts && (std::strcmp(a, "--human") == 0 || std::strcmp(a, "-H") == 0)) {
@@ -544,7 +548,7 @@ int main(int argc, char** argv) {
                           "Elapsed:         %.3f s\n",
                           tr.file_count, (std::strcmp(bu, "B") == 0 ? 0 : 1), b, bu,
                           tr.finding_count, secs);
-            std::printf("%s", ft::emit_tree_human(tr, buf, out_color, show_all).c_str());
+            std::printf("%s", ft::emit_tree_human(tr, buf, out_color, show_all, verbose).c_str());
         }
         return 0;
     }
@@ -638,7 +642,8 @@ int main(int argc, char** argv) {
                       "Elapsed:         %.3f s\n",
                       (std::strcmp(bu, "B") == 0 ? 0 : 1), b, bu, nfind, secs);
         footer += buf;
-        std::printf("%s", ft::emit_file_human(findings, regions, footer, out_color, show_all).c_str());
+        std::printf("%s",
+                    ft::emit_file_human(findings, regions, footer, out_color, show_all, verbose).c_str());
     }
     return 0;
 }

@@ -1,0 +1,50 @@
+# NOTE: all root-level keys must precede the first [[magic]] / [doc] table.
+name = "uefi_fv"
+category = "bootloader"
+
+# UEFI/PI Firmware Volume. The EFI_FIRMWARE_VOLUME_HEADER begins with a 16-byte
+# zero vector and a filesystem GUID, then the "_FVH" signature at offset 40. The
+# 16-bit header checksum sums to zero, which the validator confirms (a stray
+# "_FVH" in data will not). We size by FvLength and label the volume by its
+# filesystem GUID (the EfiSystemNvData GUID marks the NVRAM variable store, where
+# Secure Boot's PK/KEK/db/dbx live). Interpreting those variables is mithril's job.
+magic_offset = 40
+
+struct = """
+  bytes[16] zero_vector;
+  bytes[16] fs_guid;
+  u64 fv_length;
+  bytes[4] signature;
+  u32 attributes;
+  u16 header_length;
+  u16 checksum;
+  u16 ext_header_offset;
+  u8  reserved;
+  u8  revision;
+"""
+
+constraints = [
+  "header_length >= 56",
+  "header_length <= 4096",
+  "fv_length >= header_length",
+  "revision >= 1",
+  "revision <= 2",
+]
+
+# FvLength covers the whole volume (header + files).
+size = "fv_length"
+size_clamp = true
+
+# Verifies the 16-bit header checksum and labels the volume by its GUID.
+validator = "uefi_fv"
+
+[[magic]]
+ascii = "_FVH"
+endian = "little"
+
+[doc]
+description = "UEFI/PI Firmware Volume (EFI_FIRMWARE_VOLUME_HEADER). Holds the PEI/DXE modules or, when tagged with the EfiSystemNvData GUID, the NVRAM variable store carrying the Secure Boot databases. mithril parses the variables and the verified-boot posture."
+references = [
+  { title = "PI spec / EFI_FIRMWARE_VOLUME_HEADER", url = "https://uefi.org/specs/PI/1.8/" },
+  { title = "EDK2 EfiSystemNvDataGuid", url = "https://github.com/tianocore/edk2/blob/master/MdeModulePkg/Include/Guid/SystemNvDataGuid.h" },
+]
