@@ -7,12 +7,18 @@ name: release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build the .deb from and attach it to"
+        required: true
 
 permissions:
   contents: write        # needed to create/update the Release
 
 jobs:
   build:
+    if: github.event_name == 'push'        # binary tarballs only on a tag push
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -92,6 +98,8 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - name: Install packaging toolchain
         run: |
@@ -112,6 +120,7 @@ jobs:
       - name: Attach .deb to the Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
             dist/*.deb
             dist/*.deb.sha256
