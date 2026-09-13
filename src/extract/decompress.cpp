@@ -3,6 +3,7 @@
 #include "extract/decompress.hpp"
 
 #include <cstdint>
+#include <cstring>
 
 #include "extract/lzo1x.hpp"  // internal LZO1X (MIT); no GPL liblzo2 dependency
 
@@ -192,6 +193,48 @@ std::optional<std::vector<uint8_t>> microlzma_block_exact(
     const size_t produced = out_len - s.avail_out;
     lzma_end(&s);
     if (rc != LZMA_STREAM_END || produced != out_len) return std::nullopt;
+    return out;
+#else
+    return std::nullopt;
+#endif
+}
+
+std::optional<std::vector<uint8_t>> upx_lzma_block_exact(
+    [[maybe_unused]] std::span<const uint8_t> src, [[maybe_unused]] size_t out_len,
+    [[maybe_unused]] uint8_t lc, [[maybe_unused]] uint8_t lp, [[maybe_unused]] uint8_t pb) {
+#ifdef MORIA_HAVE_LZMA
+    if (src.empty() || out_len == 0 || lc > 8 || lp > 4 || pb > 4) return std::nullopt;
+    // UPX LZMA blocks are a raw LZMA1 stream (no .lzma/.xz header, no size field);
+    // lc/lp/pb come from the block's 2-byte UPX property header (stripped by the
+    // caller) and the exact decoded length is known (b_info.sz_unc), so the
+    // decoder stops precisely without an end marker. The dictionary only needs to
+    // cover the true window, so out_len (rounded to >= 4 KiB) always suffices.
+    lzma_options_lzma opt;
+    memset(&opt, 0, sizeof(opt));
+    if (lzma_lzma_preset(&opt, 6)) return std::nullopt;  // seed defaults, then override
+    opt.lc = lc;
+    opt.lp = lp;
+    opt.pb = pb;
+    uint32_t dict = 1u << 12;
+    while (dict < out_len && dict < (1u << 30)) dict <<= 1;
+    opt.dict_size = dict;
+    lzma_filter filters[2] = {
+        {LZMA_FILTER_LZMA1, &opt},
+        {LZMA_VLI_UNKNOWN, nullptr},
+    };
+    std::vector<uint8_t> out(out_len);
+    lzma_stream s = LZMA_STREAM_INIT;
+    if (lzma_raw_decoder(&s, filters) != LZMA_OK) return std::nullopt;
+    s.next_in = src.data();
+    s.avail_in = src.size();
+    s.next_out = out.data();
+    s.avail_out = out_len;
+    lzma_ret rc = lzma_code(&s, LZMA_FINISH);
+    const size_t produced = out_len - s.avail_out;
+    lzma_end(&s);
+    // A raw LZMA1 stream with an exact length reports LZMA_STREAM_END or stops at
+    // LZMA_OK with the buffer full; accept either as long as out_len was produced.
+    if ((rc != LZMA_STREAM_END && rc != LZMA_OK) || produced != out_len) return std::nullopt;
     return out;
 #else
     return std::nullopt;

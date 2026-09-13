@@ -21,6 +21,9 @@ python3 tests/test_vbf.py
 # UPX PackHeader detection + tampered-header heuristic (self-contained; also
 # cross-checks the real `upx` tool when installed).
 python3 tests/test_upx.py
+# UPX unpacking: moria -e must reproduce `upx -d` byte-for-byte (self-skips
+# without the `upx` tool; adds cross-arch packs when a toolchain is present).
+python3 tests/test_upx_extract.py
 
 echo "[3/4] the corpus accuracy (informational)"
 if [ -d "${MORIA_CORPUS:-corpus}" ]; then
