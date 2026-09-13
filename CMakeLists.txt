@@ -65,6 +65,9 @@ add_executable(moria
   src/extract/lzari.cpp
   src/extract/vbf.cpp
   src/extract/lzss.cpp
+  src/extract/ucl.cpp
+  src/extract/upx_filter.cpp
+  src/extract/upx.cpp
   src/extract/fit.cpp
   src/extract/compressed.cpp
   src/extract/android_sparse.cpp
@@ -178,6 +181,8 @@ add_executable(moria_unit
   src/ahocorasick.cpp
   src/extract/lzo1x.cpp
   src/extract/lzari.cpp
+  src/extract/ucl.cpp
+  src/extract/upx_filter.cpp
   src/deobfuscate/cipher.cpp
   src/validators/upx.cpp
 )

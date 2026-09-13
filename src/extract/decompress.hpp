@@ -58,6 +58,14 @@ std::optional<std::vector<uint8_t>> lz4_block_exact(std::span<const uint8_t> src
 std::optional<std::vector<uint8_t>> microlzma_block_exact(std::span<const uint8_t> src,
                                                           size_t out_len);
 
+// Decompress a UPX LZMA block to exactly `out_len` bytes. `src` is the raw LZMA1
+// stream with the 2-byte UPX property header already stripped; `lc`/`lp`/`pb`
+// are decoded from that header by the caller. Returns nullopt if out_len bytes
+// cannot be produced or liblzma was not compiled in.
+std::optional<std::vector<uint8_t>> upx_lzma_block_exact(std::span<const uint8_t> src,
+                                                         size_t out_len, uint8_t lc, uint8_t lp,
+                                                         uint8_t pb);
+
 // Streaming decompression of a whole standalone stream/container whose decoded
 // size is not known in advance (a gzip/xz/zstd/lz4-frame firmware wrapper). Grows
 // the output buffer as it goes, stopping at `cap` bytes. Unlike decompress(),

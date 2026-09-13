@@ -69,7 +69,7 @@ jobs:
         run: |
           pkg="moria-${GITHUB_REF_NAME}-${{ matrix.name }}"
           mkdir -p "dist/${pkg}"
-          cp build/moria moria.1 LICENSE README.md THIRD_PARTY.md "dist/${pkg}/"
+          cp build/moria moria.1 LICENSE README.md "dist/${pkg}/"
           tar -C dist -czf "${pkg}.tar.gz" "${pkg}"
           # sha256sum on Linux, shasum on macOS.
           if command -v sha256sum >/dev/null 2>&1; then

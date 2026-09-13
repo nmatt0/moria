@@ -66,4 +66,4 @@ moria does structural identification, extraction, and carving. Secret/credential
 
 ## License
 
-MIT, see `LICENSE`. Third-party code and derived-data licenses are listed in `THIRD_PARTY.md`.
+MIT, see `LICENSE`.

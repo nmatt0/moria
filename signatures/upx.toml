@@ -9,8 +9,9 @@ category = "compression"
 # mod 251, present since UPX version 10), which rejects the non-trailer hits and
 # lifts a genuine match to the verified tier. It reports the target format
 # (ELF/PE/Mach-O + arch), compression method (NRV2B/NRV2D/NRV2E/LZMA), and the
-# original/compressed sizes from the trailer. Detection only; unpacking a UPX
-# stub (reconstructing the original executable) is not yet implemented.
+# original/compressed sizes from the trailer. UPX-packed ELF images also unpack
+# with --extract: moria reconstructs the original executable byte-for-byte (the
+# same output `upx -d` produces). PE/Mach-O unpacking is not implemented.
 confidence = "magic"
 
 validator = "upx"

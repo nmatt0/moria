@@ -81,7 +81,7 @@ def main():
         "# Firmware-vendor magic-tier signatures for moria.\n"
         "# Byte patterns and offsets are facts about real firmware formats.\n"
         "# Descriptions are original (name + identifying magic + offset); no\n"
-        "# third-party prose is reproduced. See THIRD_PARTY.md for provenance.\n\n"
+        "# third-party prose is reproduced.\n\n"
     )
 
     out = [header]
