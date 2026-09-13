@@ -1,5 +1,5 @@
-moria-fw (0.2.0-1) unstable; urgency=medium
+moria-fw (0.2.1-1) unstable; urgency=medium
 
-  * Debian packaging for moria.
+  * Debian packaging for moria; a .deb is attached to each GitHub release.
 
  -- Matt Brown <matt@brownfinesecurity.com>  Sun, 13 Sep 2026 00:00:00 -0400
