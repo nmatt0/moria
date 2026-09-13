@@ -1,0 +1,35 @@
+Source: moria-fw
+Section: utils
+Priority: optional
+Maintainer: Matt Brown <matt@brownfinesecurity.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ cmake,
+ zlib1g-dev,
+ liblzma-dev,
+ liblz4-dev,
+ libzstd-dev,
+Standards-Version: 4.7.0
+Homepage: https://github.com/nmatt0/moria
+Vcs-Git: https://github.com/nmatt0/moria.git
+Vcs-Browser: https://github.com/nmatt0/moria
+Rules-Requires-Root: no
+
+Package: moria-fw
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+Description: firmware and IoT image identification and extraction tool
+ moria identifies files and embedded content in firmware and IoT images and
+ extracted rootfs trees, with confidence scores and sourced metadata as JSON.
+ It can extract common embedded filesystems (SquashFS, ext2/3/4, F2FS, UBIFS,
+ JFFS2, cramfs, EROFS, romfs, YAFFS2 and more), archives and boot/image
+ containers, reverse some known vendor payload obfuscation, and carve raw byte
+ ranges to disk. It never spawns a subprocess and makes no network calls.
+ .
+ The tool is built for use during IoT and embedded security assessments, where
+ fast structured identification of every file in an unpacked firmware tree is
+ the core value. The installed command is "moria". The package is named
+ "moria-fw" because the name "moria" is already taken in Debian by an unrelated
+ game.

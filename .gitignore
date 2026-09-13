@@ -8,6 +8,14 @@ diff-report/
 __pycache__/
 *.pyc
 repos/
+# Debian packaging build artifacts (debian/ sources are tracked; outputs are not)
+/debian/files
+/debian/*.substvars
+/debian/*.debhelper.log
+/debian/.debhelper/
+/debian/moria-fw/
+/debian/tmp/
+/obj-*/
 # Local-only dev notes (never published)
 PROGRESS.md
 docs/

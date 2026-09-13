@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+# Build moria with debhelper's cmake buildsystem. Signature sets are embedded
+# into the binary at build time, so the package ships just the binary and man
+# page.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_configure:
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release

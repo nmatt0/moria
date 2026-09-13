@@ -78,3 +78,40 @@ jobs:
           files: |
             moria-*-${{ matrix.name }}.tar.gz
             moria-*-${{ matrix.name }}.tar.gz.sha256
+
+  deb:
+    name: deb-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install packaging toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debhelper dpkg-dev cmake g++ lintian \
+            zlib1g-dev liblzma-dev liblz4-dev libzstd-dev
+
+      - name: Build .deb
+        run: |
+          dpkg-buildpackage -b -us -uc
+          mkdir -p dist
+          cp ../moria-fw_*.deb dist/        # main package only (not -dbgsym)
+          ( cd dist && for f in *.deb; do sha256sum "$f" > "$f.sha256"; done )
+
+      - name: Lintian (advisory)
+        run: lintian ../moria-fw_*.changes || true
+
+      - name: Attach .deb to the Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.deb
+            dist/*.deb.sha256
