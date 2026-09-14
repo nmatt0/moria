@@ -193,6 +193,9 @@ add_executable(moria_unit
 )
 target_include_directories(moria_unit PRIVATE src)
 
+enable_testing()
+add_test(NAME moria_unit COMMAND moria_unit)
+
 # ---------------------------------------------------------------------------
 # Install: just the binary and the man page. Every signature set is embedded in
 # the binary at build time (self-contained), so a default run needs nothing on
