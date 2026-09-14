@@ -196,6 +196,35 @@ target_include_directories(moria_unit PRIVATE src)
 enable_testing()
 add_test(NAME moria_unit COMMAND moria_unit)
 
+# The Python drivers are the bulk of the regression gate (extraction round-trips
+# and per-format identify/extract checks), mirroring tests/run.sh. Each locates
+# the built binary relative to its own path and self-skips cleanly (exit 0) when
+# an optional maker tool is absent, so they are safe to register unconditionally.
+# They need a Python 3 interpreter; without one only moria_unit above is run.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+  set(_moria_py_tests
+    test_samples
+    test_extract
+    test_rae_rfp
+    test_vbf
+    test_uboot_env
+    test_vbmeta
+    test_fit_signing
+    test_upx
+    test_upx_extract
+    test_carve
+    test_deobf
+  )
+  foreach(_t IN LISTS _moria_py_tests)
+    add_test(
+      NAME ${_t}
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/${_t}.py
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+  endforeach()
+endif()
+
 # ---------------------------------------------------------------------------
 # Install: just the binary and the man page. Every signature set is embedded in
 # the binary at build time (self-contained), so a default run needs nothing on
