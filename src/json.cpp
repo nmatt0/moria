@@ -83,6 +83,8 @@ void emit_finding(std::string& o, const Finding& f, bool with_also_matched) {
             o += "{\"name\":\"";
             escape_to(o, f.members[i].name);
             o += "\",\"size\":" + std::to_string(f.members[i].size);
+            if (f.members[i].offset != SIZE_MAX)
+                o += ",\"offset\":" + std::to_string(f.members[i].offset);
             if (!f.members[i].note.empty()) {
                 o += ",\"note\":\"";
                 escape_to(o, f.members[i].note);

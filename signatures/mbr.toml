@@ -1,0 +1,22 @@
+name = "mbr"
+category = "container"
+
+# MBR/DOS partition table: boot signature 0x55AA at offset 0x1FE (510) of the
+# boot sector. 0x55AA is a common 512-byte-sector trailer, so the validator is
+# the real filter: it requires sector alignment, valid boot flags (0x00/0x80) on
+# all four primary entries, and at least one in-disk primary. It decodes each
+# type byte, walks the extended (0x05/0x0F) EBR chain for logical partitions, and
+# rejects a bare protective MBR (single 0xEE) so a following GPT owns the map.
+magic_offset = 510
+validator = "mbr"
+confidence = "structural"   # the validator raises this to consistent when entries are sane
+
+[[magic]]
+hex = "55aa"
+endian = "little"
+
+[doc]
+description = "MBR/DOS partition table: legacy partition map (boot signature 0x55AA)."
+references = [
+  { title = "Master boot record", url = "https://en.wikipedia.org/wiki/Master_boot_record" },
+]

@@ -731,8 +731,80 @@ def android_magic_string():
     return bytes(64) + s + bytes(2048)
 
 
+def gpt_disk():
+    """A minimal valid GPT: protective MBR + LBA1 header + a 4-entry array with two
+    real partitions (EFI System, Linux filesystem). Both CRC32s are correct, so
+    moria reaches the verified tier. No third-party data."""
+    import struct
+    import zlib
+    SECT = 512
+    disk_sectors = 100
+    buf = bytearray(disk_sectors * SECT)
+    # protective MBR at LBA0: one 0xEE entry spanning the disk + 0x55AA.
+    struct.pack_into("<B", buf, 0x1BE + 4, 0xEE)                 # type = GPT protective
+    struct.pack_into("<I", buf, 0x1BE + 8, 1)                    # start LBA
+    struct.pack_into("<I", buf, 0x1BE + 12, disk_sectors - 1)   # size
+    buf[0x1FE], buf[0x1FF] = 0x55, 0xAA
+    # partition entry array at LBA2 (4 * 128 = 512 bytes).
+    EFI = bytes.fromhex("28732ac11ff8d211ba4b00a0c93ec93b")
+    LINUX = bytes.fromhex("af3dc60f838472478e793d69d8477de4")
+    arr = bytearray(4 * 128)
+    def put_entry(i, tguid, first, last, name):
+        o = i * 128
+        arr[o:o + 16] = tguid
+        arr[o + 16:o + 32] = bytes(range(16))                   # unique guid (arbitrary)
+        struct.pack_into("<Q", arr, o + 32, first)
+        struct.pack_into("<Q", arr, o + 40, last)
+        nm = name.encode("utf-16-le")[:72]
+        arr[o + 56:o + 56 + len(nm)] = nm
+    put_entry(0, EFI, 34, 40, "ESP")
+    put_entry(1, LINUX, 41, 60, "rootfs")
+    arr_crc = zlib.crc32(bytes(arr)) & 0xFFFFFFFF
+    # GPT header at LBA1.
+    hdr = bytearray(92)
+    hdr[0:8] = b"EFI PART"
+    struct.pack_into("<I", hdr, 8, 0x00010000)                  # revision 1.0
+    struct.pack_into("<I", hdr, 12, 92)                         # header size
+    struct.pack_into("<Q", hdr, 24, 1)                          # my_lba
+    struct.pack_into("<Q", hdr, 32, disk_sectors - 1)           # alternate_lba
+    struct.pack_into("<Q", hdr, 40, 34)                         # first usable
+    struct.pack_into("<Q", hdr, 48, disk_sectors - 34)         # last usable
+    hdr[56:72] = bytes(range(16, 32))                           # disk guid
+    struct.pack_into("<Q", hdr, 72, 2)                          # partition_entry_lba
+    struct.pack_into("<I", hdr, 80, 4)                          # num entries
+    struct.pack_into("<I", hdr, 84, 128)                        # entry size
+    struct.pack_into("<I", hdr, 88, arr_crc)                    # array crc
+    hcrc = zlib.crc32(bytes(hdr)) & 0xFFFFFFFF                  # crc field is 0 here
+    struct.pack_into("<I", hdr, 16, hcrc)
+    buf[SECT:SECT + 92] = hdr
+    buf[2 * SECT:2 * SECT + len(arr)] = arr
+    return bytes(buf)
+
+
+def mbr_disk():
+    """A minimal MBR/DOS table: three primary partitions (FAT32, Linux, Linux) with
+    valid boot flags and in-disk LBA ranges -> consistent tier."""
+    import struct
+    SECT = 512
+    disk_sectors = 400
+    buf = bytearray(disk_sectors * SECT)
+    def put(i, ptype, start, count):
+        o = 0x1BE + i * 16
+        buf[o] = 0x00                                            # boot flag
+        buf[o + 4] = ptype
+        struct.pack_into("<I", buf, o + 8, start)
+        struct.pack_into("<I", buf, o + 12, count)
+    put(0, 0x0C, 1, 40)     # FAT32 (LBA)
+    put(1, 0x83, 41, 60)    # Linux
+    put(2, 0x83, 101, 90)   # Linux
+    buf[0x1FE], buf[0x1FF] = 0x55, 0xAA
+    return bytes(buf)
+
+
 # name -> (builder, expected_type or None, min_confidence)
 MANIFEST = [
+    ("gpt.bin", gpt_disk, "gpt", VERIFIED),
+    ("mbr.bin", mbr_disk, "mbr", CONSISTENT),
     ("squashfs_v4_le.bin", squashfs_v4_le, "squashfs", CONSISTENT),
     ("squashfs_v3_le.bin", squashfs_v3_le, "squashfs_legacy", STRUCTURAL),
     ("squashfs_shsq.bin", squashfs_shsq, "squashfs", STRUCTURAL),

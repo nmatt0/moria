@@ -8,6 +8,7 @@
 #include "validators/ihex.hpp"
 #include "validators/jffs2.hpp"
 #include "validators/jpeg.hpp"
+#include "validators/partition.hpp"
 #include "validators/rae_rfp.hpp"
 #include "validators/squashfs.hpp"
 #include "validators/tar.hpp"
@@ -47,6 +48,8 @@ Validator find_validator(const std::string& name) {
     if (name == "uboot_env") return validate_uboot_env;
     if (name == "ubi") return validate_ubi;
     if (name == "ubifs") return validate_ubifs;
+    if (name == "gpt") return validate_gpt;
+    if (name == "mbr") return validate_mbr;
     return nullptr;
 }
 

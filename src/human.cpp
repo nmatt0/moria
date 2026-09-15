@@ -238,7 +238,12 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
                 std::string conn = top ? "" : (last ? "└─ " : "├─ ");
                 const Item& it = items[i];
                 if (it.mem) {
-                    Row r; r.first = prefix + conn + it.mem->name; r.mem = it.mem;
+                    // A located member (a partition) leads with its magenta offset,
+                    // then the name; a plain member (a UBI volume) is name-only.
+                    std::string loc = it.mem->offset != SIZE_MAX
+                                          ? hex_off(it.mem->offset) + " " + it.mem->name
+                                          : it.mem->name;
+                    Row r; r.first = prefix + conn + loc; r.mem = it.mem;
                     rows.push_back(r);
                     if (!it.mem->children.empty()) {
                         std::vector<const Finding*> cs;
@@ -303,10 +308,18 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
             o += p.dim() + r.first + r.note + p.reset() + "\n";
             continue;
         }
-        if (r.mem) {  // volume row: name (bold) in the OFFSET col, size, content-type
+        if (r.mem) {  // volume/partition row: name (bold) in the OFFSET col, size, type
             std::string name = r.mem->name;
             std::string pre = r.first.substr(0, r.first.size() - name.size());
             std::string line = p.dim() + pre + p.reset() + p.bold() + name + p.reset();
+            // A located member's offset lives in `pre` just before the name; recolor
+            // that hex magenta so it reads like a finding offset.
+            if (r.mem->offset != SIZE_MAX) {
+                std::string offhex = hex_off(r.mem->offset);
+                std::string glyphs = pre.substr(0, pre.size() - offhex.size() - 1);  // drop "<hex> "
+                line = p.dim() + glyphs + p.reset() + p.off() + offhex + p.reset() + " " +
+                       p.bold() + name + p.reset();
+            }
             line.append(pad, ' ');
             line += "  ";
             col(line, human_size(r.mem->size), w_size, "", "");

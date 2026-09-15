@@ -116,6 +116,7 @@ add_executable(moria
   src/validators/tar.cpp
   src/validators/ubi.cpp
   src/validators/dtb.cpp
+  src/validators/partition.cpp
 )
 target_include_directories(moria PRIVATE src third_party)
 target_compile_definitions(moria PRIVATE MORIA_VERSION="${PROJECT_VERSION}")
@@ -207,6 +208,7 @@ if(Python3_Interpreter_FOUND)
     test_samples
     test_extract
     test_human_tree
+    test_partition
     test_rae_rfp
     test_vbf
     test_uboot_env

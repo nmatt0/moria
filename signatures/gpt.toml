@@ -1,0 +1,22 @@
+name = "gpt"
+category = "container"
+
+# GPT header ("EFI PART") at LBA1 (file offset 512 for 512-byte sectors, 4096 for
+# 4K). The validator verifies the header + partition-entry-array CRC32, decodes
+# each partition's type GUID, and emits the partitions as members (labeled region
+# map). Filesystems inside the partitions are identified/extracted by the normal
+# pipeline; the finding is sized to just the GPT metadata so it does not enclose
+# them. A backup header (my_lba != 1) is rejected.
+validator = "gpt"
+confidence = "structural"   # the validator raises this to verified on CRC match
+
+[[magic]]
+ascii = "EFI PART"
+endian = "little"
+
+[doc]
+description = "GUID Partition Table (GPT): CRC-checked partition map for eMMC/SD/UFS/Android/PC disks."
+references = [
+  { title = "UEFI Specification — GPT", url = "https://uefi.org/specifications" },
+  { title = "GUID Partition Table", url = "https://en.wikipedia.org/wiki/GUID_Partition_Table" },
+]

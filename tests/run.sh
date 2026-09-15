@@ -16,6 +16,8 @@ python3 tests/test_samples.py
 python3 tests/test_extract.py
 # Human -e extraction-tree rendering (self-contained hard gate; stdlib fixtures).
 python3 tests/test_human_tree.py
+# GPT/MBR partition-table identify + region map (synthetic + real-tool round-trip).
+python3 tests/test_partition.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
 python3 tests/test_rae_rfp.py
 # VBF block extraction + LZSS decode round-trip (self-contained hard gate).
