@@ -206,6 +206,7 @@ if(Python3_Interpreter_FOUND)
   set(_moria_py_tests
     test_samples
     test_extract
+    test_human_tree
     test_rae_rfp
     test_vbf
     test_uboot_env
