@@ -8,6 +8,7 @@
 #include "validators/ihex.hpp"
 #include "validators/jffs2.hpp"
 #include "validators/jpeg.hpp"
+#include "validators/luks.hpp"
 #include "validators/partition.hpp"
 #include "validators/rae_rfp.hpp"
 #include "validators/squashfs.hpp"
@@ -50,6 +51,7 @@ Validator find_validator(const std::string& name) {
     if (name == "ubifs") return validate_ubifs;
     if (name == "gpt") return validate_gpt;
     if (name == "mbr") return validate_mbr;
+    if (name == "luks") return validate_luks;
     return nullptr;
 }
 
