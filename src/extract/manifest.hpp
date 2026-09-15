@@ -29,6 +29,11 @@ struct Extracted {
     uint64_t consumed = 0;     // input bytes this finding spanned (0 = unknown)
     size_t depth = 1;          // recursion level (1 = top-level input)
     std::vector<std::string> warnings;
+    // The identification that spawned this extraction, kept so the human tree can
+    // show the same TIER/NOTES a standalone scan of the produced file would (its
+    // confidence tier, endian/arch, compression, embedded label, diagnostics). Not
+    // serialized to JSON (the "extracted" array stays as-is).
+    Finding finding;
 };
 
 struct Manifest {

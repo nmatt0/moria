@@ -296,6 +296,7 @@ void extract_findings(ft::Reader& reader, const std::vector<ft::Finding>& findin
                            : prefix + "/" + off_hex + "-" + f.type;
         ft::Extracted e;
         e.depth = level;
+        e.finding = f;  // keep the identification for the human extraction tree
         ex(reader, f, c.root, sub, e);
         c.total_files += e.files;
         c.total_bytes += e.bytes;
@@ -354,8 +355,8 @@ std::string human_bytes(uint64_t n) {
 std::string run_extraction(const std::string& src_path, ft::Reader& reader,
                            const std::vector<ft::Finding>& findings,
                            const std::vector<ft::Signature>& sigs, const std::string& outdir,
-                           size_t max_depth, size_t max_files, uint64_t max_bytes, bool all) {
-    ft::Manifest manifest;
+                           size_t max_depth, size_t max_files, uint64_t max_bytes, bool all,
+                           ft::Manifest& manifest) {
     manifest.source = src_path;
 
     ft::SafeRoot root;
@@ -588,10 +589,11 @@ int main(int argc, char** argv) {
                       " interior findings hidden; -A to show)";
     std::string extraction;
     std::string outdir;
+    ft::Manifest manifest;
     if (extract) {
         outdir = outdir_cli.empty() ? path + ".extracted" : outdir_cli;
         extraction = run_extraction(path, reader, findings, sigs.signatures, outdir, rec_depth,
-                                    rec_max_files, rec_max_bytes, show_all);
+                                    rec_max_files, rec_max_bytes, show_all, manifest);
     }
     // Carve (`-c`): dump each finding's raw byte range (and the unidentified gaps)
     // to disk without parsing, so a researcher gets the bytes even when extraction
@@ -642,8 +644,13 @@ int main(int argc, char** argv) {
                       "Elapsed:         %.3f s\n",
                       (std::strcmp(bu, "B") == 0 ? 0 : 1), b, bu, nfind, secs);
         footer += buf;
-        std::printf("%s",
-                    ft::emit_file_human(findings, regions, footer, out_color, show_all, verbose).c_str());
+        // When extraction ran, render the recursive extraction tree (findings at
+        // the top, extracted descendants nested beneath) instead of the flat
+        // findings table, so human output reflects what -e actually unpacked.
+        const ft::Manifest* mp = (extract && !manifest.entries.empty()) ? &manifest : nullptr;
+        std::printf("%s", ft::emit_file_human(findings, regions, footer, out_color, show_all,
+                                              verbose, mp)
+                              .c_str());
     }
     return 0;
 }

@@ -14,6 +14,8 @@ echo "[2/4] unit tests + synthetic sample regression (hard gate)"
 python3 tests/test_samples.py
 # Extraction round-trip (hard gate when mksquashfs is present; self-skips if not).
 python3 tests/test_extract.py
+# Human -e extraction-tree rendering (self-contained hard gate; stdlib fixtures).
+python3 tests/test_human_tree.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
 python3 tests/test_rae_rfp.py
 # VBF block extraction + LZSS decode round-trip (self-contained hard gate).

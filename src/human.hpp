@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "assess.hpp"
+#include "extract/manifest.hpp"
 #include "finding.hpp"
 #include "tree.hpp"
 
@@ -20,9 +21,13 @@ namespace ft {
 // When `all` is false, a swarm of same-type siblings (compressed nodes, a cert
 // bundle) collapses to one row + a count; `all` lists every finding.
 // `verbose` (the -v flag) shows full labels instead of ellipsis-truncating them.
+// When `extraction` is non-null, the findings table is replaced by the recursive
+// extraction tree: each top-level finding is drawn with its extracted descendants
+// (from the manifest) nested beneath it.
 std::string emit_file_human(const std::vector<Finding>& findings,
                             const std::vector<Region>& regions, const std::string& footer,
-                            bool color, bool all, bool verbose = false);
+                            bool color, bool all, bool verbose = false,
+                            const Manifest* extraction = nullptr);
 
 // Directory tree: by-type counts + notable table (grouped by directory), then a
 // plain `footer` (run stats) after a blank line. Mirrors the single-file view:
