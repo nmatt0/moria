@@ -58,6 +58,10 @@ struct Member {
     size_t size;
     std::string note;
     std::vector<Finding> children;  // findings that live inside this member (a UBI volume)
+    // Absolute byte offset in the image, when the member is a located region (a
+    // GPT/MBR partition). SIZE_MAX = no offset (an archive member / UBI volume,
+    // which has no single image offset); such members render name-only.
+    size_t offset = SIZE_MAX;
 };
 
 struct Finding {
