@@ -28,7 +28,9 @@ def coverage_gate():
     else be explicitly waived. Keeps the suite honest as signatures grow."""
     import glob
     import re
-    waived = set()  # none currently — all core sigs have fixtures
+    # The luks signature (one magic) emits version-specific types luks1/luks2,
+    # each with its own fixture, so the family name has no fixture of its own.
+    waived = {"luks"}
     sig_names = set()
     for p in glob.glob(os.path.join(HERE, "..", "signatures", "*.toml")):
         m = re.search(r'(?m)^name\s*=\s*"([^"]+)"', open(p).read())

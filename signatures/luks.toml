@@ -1,0 +1,21 @@
+name = "luks"
+category = "encrypted"
+
+# LUKS1/LUKS2 (dm-crypt) on-disk header: magic "LUKS\xba\xbe" at offset 0, then a
+# big-endian version word. The validator parses the header (LUKS1 binary phdr,
+# LUKS2 binary header + JSON metadata) and reports cipher/mode, KDF, key size and
+# UUID. Identify only — the payload is encrypted and stays opaque (no decryption,
+# no extractor). Reaches consistent tier (no header checksum is verified).
+validator = "luks"
+confidence = "structural"
+
+[[magic]]
+hex = "4c554b53babe"
+endian = "little"
+
+[doc]
+description = "LUKS (dm-crypt) encrypted volume: LUKS1/LUKS2 header, encrypted payload."
+references = [
+  { title = "LUKS2 on-disk format", url = "https://gitlab.com/cryptsetup/LUKS2-docs" },
+  { title = "LUKS1 on-disk format", url = "https://gitlab.com/cryptsetup/cryptsetup/-/wikis/LUKS-standard" },
+]
