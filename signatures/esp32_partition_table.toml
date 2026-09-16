@@ -1,0 +1,27 @@
+name = "esp32_partition_table"
+category = "container"
+
+# ESP-IDF partition table: 32-byte little-endian entries (u16 magic 0xAA50,
+# type, subtype, offset, size, 16-byte label), flashed at 0x8000 by default and
+# terminated by an MD5 entry (magic 0xEBEB) or 0xFF fill. 0xAA50 is only a
+# 2-byte anchor, so the validator is the real filter: it requires 4 KB table
+# alignment, sector-aligned non-overlapping partitions within a sane flash
+# bound, and at least two recognized app/data entries (a table at a custom
+# CONFIG_PARTITION_TABLE_OFFSET is caught by the same scan). It decodes each
+# type/subtype and emits the partitions as members (labeled region map);
+# content inside the regions (NVS, a filesystem, an app image) is identified by
+# the normal pipeline, exactly like GPT/MBR.
+magic_offset = 0
+validator = "esp32_partition_table"
+confidence = "structural"   # the validator raises this to consistent when entries are sane
+
+[[magic]]
+hex = "aa50"
+endian = "little"
+
+[doc]
+description = "ESP-IDF partition table: labeled region map of an ESP32-family flash image (app/data partitions, NVS, OTA slots, filesystems)."
+vendor = "Espressif"
+references = [
+  { title = "ESP-IDF Partition Tables", url = "https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/partition-tables.html" },
+]

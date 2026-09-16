@@ -117,6 +117,7 @@ add_executable(moria
   src/validators/ubi.cpp
   src/validators/dtb.cpp
   src/validators/partition.cpp
+  src/validators/esp32_part.cpp
   src/validators/legacy_fs.cpp
   src/validators/luks.cpp
 )

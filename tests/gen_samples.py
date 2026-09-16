@@ -801,6 +801,34 @@ def mbr_disk():
     return bytes(buf)
 
 
+def esp32_part_table():
+    """A minimal ESP-IDF partition table at 0x8000: nvs + phy_init + factory app
+    (all recognized type/subtypes, sector-aligned, non-overlapping) + MD5
+    terminator entry -> consistent tier. The image tail is erased (0xFF) flash."""
+    import hashlib
+    buf = _buf(0x20000)
+    for i in range(len(buf)):
+        buf[i] = 0xFF
+    entries = [
+        (0x01, 0x02, 0x9000, 0x6000, "nvs"),
+        (0x01, 0x01, 0xF000, 0x1000, "phy_init"),
+        (0x00, 0x00, 0x10000, 0x10000, "factory"),
+    ]
+    raw = bytearray()
+    for ptype, subtype, off, size, label in entries:
+        e = bytearray(32)
+        e[0:2] = b"\xaa\x50"
+        e[2], e[3] = ptype, subtype
+        struct.pack_into("<I", e, 4, off)
+        struct.pack_into("<I", e, 8, size)
+        e[12:12 + len(label)] = label.encode()
+        raw += e
+    md5_entry = b"\xeb\xeb" + b"\xff" * 14 + hashlib.md5(bytes(raw)).digest()
+    buf[0x8000:0x8000 + len(raw)] = raw
+    buf[0x8000 + len(raw):0x8000 + len(raw) + 32] = md5_entry
+    return bytes(buf)
+
+
 def luks1_hdr():
     """A LUKS1 phdr (big-endian): aes-xts-plain64, sha256, 512-bit master key."""
     import struct
@@ -923,6 +951,7 @@ def logfs_sb():
 MANIFEST = [
     ("gpt.bin", gpt_disk, "gpt", VERIFIED),
     ("mbr.bin", mbr_disk, "mbr", CONSISTENT),
+    ("esp32_part.bin", esp32_part_table, "esp32_partition_table", CONSISTENT),
     ("nilfs2.bin", nilfs2_sb, "nilfs2", VERIFIED),
     ("minix.bin", minix_sb, "minix", CONSISTENT),
     ("reiserfs.bin", reiserfs_sb, "reiserfs", CONSISTENT),
