@@ -1,0 +1,25 @@
+name = "ufs"
+category = "filesystem"
+
+# UFS/FFS (BSD) superblock: fs_magic at SB+0x55C, either endianness.
+# 0x00011954 = UFS1, 0x19540119 = UFS2. The four magics are the LE/BE encodings.
+magic_offset = 1372
+validator = "ufs"
+confidence = "structural"
+
+[[magic]]
+hex = "54190100"
+endian = "little"
+[[magic]]
+hex = "19015419"
+endian = "little"
+[[magic]]
+hex = "00011954"
+endian = "little"
+[[magic]]
+hex = "19540119"
+endian = "little"
+
+[doc]
+description = "UFS/FFS (BSD Unix File System, UFS1/UFS2)."
+references = [ { title = "Unix File System", url = "https://en.wikipedia.org/wiki/Unix_File_System" } ]

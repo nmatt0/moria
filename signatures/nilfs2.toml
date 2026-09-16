@@ -1,0 +1,16 @@
+name = "nilfs2"
+category = "filesystem"
+
+# NILFS2 superblock at byte 1024; s_magic 0x3434 at +6 (so 1030 from the fs start).
+# A 2-byte magic, so the validator leans on the surrounding geometry fields.
+magic_offset = 1030
+validator = "nilfs2"
+confidence = "structural"
+
+[[magic]]
+hex = "3434"
+endian = "little"
+
+[doc]
+description = "NILFS2 (New Implementation of a Log-structured File System)."
+references = [ { title = "NILFS", url = "https://nilfs.sourceforge.io/" } ]

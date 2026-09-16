@@ -59,6 +59,12 @@ inline const char* mime_for_type(const std::string& t) {
     if (t == "fat" || t == "fat32") return "application/x-fat";
     if (t == "exfat") return "application/x-exfat";
     if (t == "ntfs") return "application/x-ntfs";
+    if (t == "nilfs2") return "application/x-nilfs2";
+    if (t == "minix") return "application/x-minix-fs";
+    if (t == "reiserfs") return "application/x-reiserfs";
+    if (t == "ufs") return "application/x-ufs";
+    if (t == "apfs") return "application/x-apfs";
+    if (t == "logfs") return "application/x-logfs";
     // --- containers / firmware / bootloaders ------------------------------
     if (t == "android_boot") return "application/x-android-bootimg";
     if (t == "android_sparse") return "application/x-android-sparse";

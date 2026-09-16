@@ -28,9 +28,11 @@ def coverage_gate():
     else be explicitly waived. Keeps the suite honest as signatures grow."""
     import glob
     import re
-    # The luks signature (one magic) emits version-specific types luks1/luks2,
-    # each with its own fixture, so the family name has no fixture of its own.
-    waived = {"luks"}
+    # Signatures whose emitted type differs from the signature name, so the name
+    # itself has no fixture: luks -> luks1/luks2 (version in the type); minix_v3 is
+    # a second magic feeding the shared "minix" validator (v3's s_magic is at a
+    # different superblock offset).
+    waived = {"luks", "minix_v3"}
     sig_names = set()
     for p in glob.glob(os.path.join(HERE, "..", "signatures", "*.toml")):
         m = re.search(r'(?m)^name\s*=\s*"([^"]+)"', open(p).read())

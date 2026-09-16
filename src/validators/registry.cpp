@@ -8,6 +8,7 @@
 #include "validators/ihex.hpp"
 #include "validators/jffs2.hpp"
 #include "validators/jpeg.hpp"
+#include "validators/legacy_fs.hpp"
 #include "validators/luks.hpp"
 #include "validators/partition.hpp"
 #include "validators/rae_rfp.hpp"
@@ -52,6 +53,12 @@ Validator find_validator(const std::string& name) {
     if (name == "gpt") return validate_gpt;
     if (name == "mbr") return validate_mbr;
     if (name == "luks") return validate_luks;
+    if (name == "nilfs2") return validate_nilfs2;
+    if (name == "minix") return validate_minix;
+    if (name == "reiserfs") return validate_reiserfs;
+    if (name == "ufs") return validate_ufs;
+    if (name == "apfs") return validate_apfs;
+    if (name == "logfs") return validate_logfs;
     return nullptr;
 }
 

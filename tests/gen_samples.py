@@ -839,9 +839,96 @@ def luks2_hdr():
 
 
 # name -> (builder, expected_type or None, min_confidence)
+def _sb_image(total, sb_off, fields):
+    """A zero image of `total` bytes with (offset, struct-format, value) tuples
+    packed in (offsets relative to sb_off). Helper for the legacy-fs superblocks."""
+    import struct
+    b = bytearray(total)
+    for off, fmt, val in fields:
+        struct.pack_into(fmt, b, sb_off + off, val)
+    return bytes(b)
+
+
+def nilfs2_sb():
+    # superblock at 1024; s_magic 0x3434 @ +6, with a correct s_sum CRC32
+    # (crc32_le(s_crc_seed, sb[0..s_bytes] with s_sum zeroed)).
+    import struct
+    import zlib
+    b = bytearray(_sb_image(4096, 1024, [
+        (6, "<H", 0x3434),        # s_magic
+        (8, "<H", 0x88),          # s_bytes (checksummed length)
+        (0x0C, "<I", 0x12345678), # s_crc_seed
+        (0x14, "<I", 0),          # s_log_block_size -> 1024
+        (0x18, "<Q", 8),          # s_nsegments
+        (0x20, "<Q", 4194304),    # s_dev_size
+        (0x30, "<I", 2048),       # s_blocks_per_segment
+    ]))
+    seed, s_bytes = 0x12345678, 0x88
+    region = bytearray(b[1024:1024 + s_bytes])
+    region[0x10:0x14] = b"\x00\x00\x00\x00"  # zero s_sum for the CRC
+    crc = (zlib.crc32(bytes(region), seed ^ 0xFFFFFFFF) ^ 0xFFFFFFFF) & 0xFFFFFFFF
+    struct.pack_into("<I", b, 1024 + 0x10, crc)
+    return bytes(b)
+
+
+def minix_sb():
+    # Minix v3 superblock at 1024: s_magic 0x4D5A @ +0x18.
+    return _sb_image(4096, 1024, [
+        (0x00, "<I", 64),       # s_ninodes (v3: u32)
+        (6, "<H", 1),           # s_imap_blocks
+        (8, "<H", 1),           # s_zmap_blocks
+        (0x14, "<I", 4096),     # s_zones
+        (0x18, "<H", 0x4D5A),   # s_magic (v3)
+        (0x1C, "<H", 1024),     # s_blocksize
+    ])
+
+
+def reiserfs_sb():
+    # ReiserFS 3.6 superblock placed at 8 KiB; s_magic "ReIsEr2Fs" @ SB+0x34.
+    b = bytearray(_sb_image(0x2200, 0x2000, [
+        (0x00, "<I", 1000),     # s_block_count
+        (0x2C, "<H", 4096),     # s_blocksize
+    ]))
+    b[0x2000 + 0x34:0x2000 + 0x34 + 9] = b"ReIsEr2Fs"
+    return bytes(b)
+
+
+def ufs_sb():
+    # UFS1 superblock at 0; fs_magic 0x00011954 (LE) @ +0x55C.
+    return _sb_image(0x600, 0, [
+        (0x30, "<I", 8192),        # fs_bsize
+        (0x34, "<I", 1024),        # fs_fsize
+        (0x55C, "<I", 0x00011954), # fs_magic (UFS1, little-endian)
+    ])
+
+
+def apfs_sb():
+    # APFS container superblock at 0; nx_magic "NXSB" @ +0x20.
+    b = bytearray(_sb_image(4096, 0, [
+        (0x24, "<I", 4096),     # nx_block_size
+        (0x28, "<Q", 100000),   # nx_block_count
+    ]))
+    b[0x20:0x24] = b"NXSB"
+    return bytes(b)
+
+
+def logfs_sb():
+    # LogFS 64-bit magic (big-endian) at offset 0.
+    import struct
+    b = bytearray(4096)
+    struct.pack_into(">Q", b, 0, 0x7A3A8E5CB9D5BF67)
+    return bytes(b)
+
+
 MANIFEST = [
     ("gpt.bin", gpt_disk, "gpt", VERIFIED),
     ("mbr.bin", mbr_disk, "mbr", CONSISTENT),
+    ("nilfs2.bin", nilfs2_sb, "nilfs2", VERIFIED),
+    ("minix.bin", minix_sb, "minix", CONSISTENT),
+    ("reiserfs.bin", reiserfs_sb, "reiserfs", CONSISTENT),
+    ("ufs.bin", ufs_sb, "ufs", CONSISTENT),
+    ("apfs.bin", apfs_sb, "apfs", CONSISTENT),
+    ("logfs.bin", logfs_sb, "logfs", CONSISTENT),
     ("luks1.bin", luks1_hdr, "luks1", CONSISTENT),
     ("luks2.bin", luks2_hdr, "luks2", CONSISTENT),
     ("squashfs_v4_le.bin", squashfs_v4_le, "squashfs", CONSISTENT),

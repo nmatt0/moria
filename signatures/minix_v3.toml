@@ -1,0 +1,16 @@
+name = "minix_v3"
+category = "filesystem"
+
+# Minix v3 superblock at byte 1024; s_magic 0x4D5A at +0x18 (1048 from fs start).
+# Emits type "minix" (the validator unifies the family); see minix.toml.
+magic_offset = 1048
+validator = "minix"
+confidence = "structural"
+
+[[magic]]
+hex = "5a4d"
+endian = "little"
+
+[doc]
+description = "Minix filesystem (v3)."
+references = [ { title = "Minix fs", url = "https://en.wikipedia.org/wiki/MINIX_file_system" } ]

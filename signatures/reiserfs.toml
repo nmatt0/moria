@@ -1,0 +1,22 @@
+name = "reiserfs"
+category = "filesystem"
+
+# ReiserFS superblock (at 8 KiB for 3.5, 64 KiB for 3.6); the s_magic[10] string
+# sits at SB+0x34, so ctx.offset lands on the superblock start.
+magic_offset = 52
+validator = "reiserfs"
+confidence = "structural"
+
+[[magic]]
+ascii = "ReIsErFs"
+endian = "little"
+[[magic]]
+ascii = "ReIsEr2Fs"
+endian = "little"
+[[magic]]
+ascii = "ReIsEr3Fs"
+endian = "little"
+
+[doc]
+description = "ReiserFS (3.5/3.6) filesystem."
+references = [ { title = "ReiserFS", url = "https://en.wikipedia.org/wiki/ReiserFS" } ]

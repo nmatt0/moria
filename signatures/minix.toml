@@ -1,0 +1,25 @@
+name = "minix"
+category = "filesystem"
+
+# Minix v1/v2 superblock at byte 1024; s_magic at +0x10 (1040 from the fs start).
+# 0x137F/0x138F = v1 (14/30-char names), 0x2468/0x2478 = v2.
+magic_offset = 1040
+validator = "minix"
+confidence = "structural"
+
+[[magic]]
+hex = "7f13"
+endian = "little"
+[[magic]]
+hex = "8f13"
+endian = "little"
+[[magic]]
+hex = "6824"
+endian = "little"
+[[magic]]
+hex = "7824"
+endian = "little"
+
+[doc]
+description = "Minix filesystem (v1/v2)."
+references = [ { title = "Minix fs", url = "https://en.wikipedia.org/wiki/MINIX_file_system" } ]

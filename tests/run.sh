@@ -18,6 +18,8 @@ python3 tests/test_extract.py
 python3 tests/test_human_tree.py
 # GPT/MBR partition-table identify + region map (synthetic + real-tool round-trip).
 python3 tests/test_partition.py
+# Legacy block filesystems: NILFS2/Minix/ReiserFS/UFS/APFS/LogFS identify (+ real mkfs.minix).
+python3 tests/test_legacy_fs.py
 # LUKS1/LUKS2 identify with header parameters (synthetic + real cryptsetup).
 python3 tests/test_luks.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
