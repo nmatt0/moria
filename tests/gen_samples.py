@@ -801,6 +801,109 @@ def mbr_disk():
     return bytes(buf)
 
 
+def esp32_part_table():
+    """A minimal ESP-IDF partition table at 0x8000: nvs + phy_init + factory app
+    (all recognized type/subtypes, sector-aligned, non-overlapping) + MD5
+    terminator entry -> consistent tier. The image tail is erased (0xFF) flash."""
+    import hashlib
+    buf = _buf(0x20000)
+    for i in range(len(buf)):
+        buf[i] = 0xFF
+    entries = [
+        (0x01, 0x02, 0x9000, 0x6000, "nvs"),
+        (0x01, 0x01, 0xF000, 0x1000, "phy_init"),
+        (0x00, 0x00, 0x10000, 0x10000, "factory"),
+    ]
+    raw = bytearray()
+    for ptype, subtype, off, size, label in entries:
+        e = bytearray(32)
+        e[0:2] = b"\xaa\x50"
+        e[2], e[3] = ptype, subtype
+        struct.pack_into("<I", e, 4, off)
+        struct.pack_into("<I", e, 8, size)
+        e[12:12 + len(label)] = label.encode()
+        raw += e
+    md5_entry = b"\xeb\xeb" + b"\xff" * 14 + hashlib.md5(bytes(raw)).digest()
+    buf[0x8000:0x8000 + len(raw)] = raw
+    buf[0x8000 + len(raw):0x8000 + len(raw) + 32] = md5_entry
+    return bytes(buf)
+
+
+# --- ESP-IDF NVS fixture helpers (also used by test_esp32_nvs.py) -------------
+
+def nvs_crc(data):
+    """The NVS CRC variant: zlib crc32 seeded with 0xFFFFFFFF."""
+    return zlib.crc32(data, 0xFFFFFFFF) & 0xFFFFFFFF
+
+
+def nvs_entry(ns, etype, key, data8, span=1, chunk=0xFF):
+    """One 32-byte entry header (data8 = the 8-byte data field)."""
+    e = bytearray(32)
+    e[0], e[1], e[2], e[3] = ns, etype, span, chunk
+    kb = key.encode()[:15]
+    e[8:8 + len(kb)] = kb
+    e[24:32] = data8
+    struct.pack_into("<I", e, 4, nvs_crc(bytes(e[0:4]) + bytes(e[8:32])))
+    return bytes(e)
+
+
+def nvs_int(ns, etype, key, value):
+    """A fixed-size integer/float entry (value packed little-endian)."""
+    size = etype & 0x0F
+    data8 = int(value).to_bytes(size, "little", signed=bool(etype & 0x10))
+    return nvs_entry(ns, etype, key, data8.ljust(8, b"\xff"))
+
+
+def nvs_varlen(ns, etype, key, value, chunk=0xFF):
+    """A string/blob entry chain: header entry + continuation entries."""
+    span = 1 + (len(value) + 31) // 32
+    data8 = struct.pack("<HHI", len(value), 0, nvs_crc(value))
+    entries = [nvs_entry(ns, etype, key, data8, span=span, chunk=chunk)]
+    cont = value + b"\xff" * ((span - 1) * 32 - len(value))
+    for i in range(0, len(cont), 32):
+        entries.append(cont[i:i + 32])
+    return entries
+
+
+def nvs_namespace(index, name):
+    return nvs_entry(0, 0x01, name, bytes([index]) + b"\xff" * 7)
+
+
+def nvs_blob_index(ns, key, size, chunk_count, chunk_start):
+    data8 = struct.pack("<IBBH", size, chunk_count, chunk_start, 0)
+    return nvs_entry(ns, 0x48, key, data8)
+
+
+def nvs_page(seqno, entries, state=0xFFFFFFFE, version=0xFE):
+    """One 4 KiB page: header + entry state bitmap + the given 32-byte entries."""
+    page = bytearray(b"\xff" * 4096)
+    struct.pack_into("<I", page, 0, state)
+    struct.pack_into("<I", page, 4, seqno)
+    page[8] = version
+    struct.pack_into("<I", page, 28, nvs_crc(bytes(page[4:28])))
+    for i in range(len(entries)):
+        sh = 2 * (i % 4)
+        page[32 + i // 4] = (page[32 + i // 4] & ~(0b11 << sh)) | (0b10 << sh)
+    pos = 64
+    for e in entries:
+        assert len(e) == 32
+        page[pos:pos + 32] = e
+        pos += 32
+    return bytes(page)
+
+
+def esp32_nvs_part():
+    """A one-page NVS partition: namespace "wifi" with a string, a credential-
+    looking string, and an integer -> verified tier (header + entry CRCs)."""
+    entries = [
+        nvs_namespace(1, "wifi"),
+        *nvs_varlen(1, 0x21, "ssid", b"moria-testnet\x00"),
+        *nvs_varlen(1, 0x21, "password", b"Sup3rSecret!\x00"),
+        nvs_int(1, 0x04, "channel", 6),
+    ]
+    return nvs_page(1, entries) + b"\xff" * 4096  # one valid + one erased page
+
+
 def luks1_hdr():
     """A LUKS1 phdr (big-endian): aes-xts-plain64, sha256, 512-bit master key."""
     import struct
@@ -923,6 +1026,8 @@ def logfs_sb():
 MANIFEST = [
     ("gpt.bin", gpt_disk, "gpt", VERIFIED),
     ("mbr.bin", mbr_disk, "mbr", CONSISTENT),
+    ("esp32_part.bin", esp32_part_table, "esp32_partition_table", CONSISTENT),
+    ("esp32_nvs.bin", esp32_nvs_part, "esp32_nvs", VERIFIED),
     ("nilfs2.bin", nilfs2_sb, "nilfs2", VERIFIED),
     ("minix.bin", minix_sb, "minix", CONSISTENT),
     ("reiserfs.bin", reiserfs_sb, "reiserfs", CONSISTENT),

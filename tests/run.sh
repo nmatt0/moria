@@ -18,6 +18,9 @@ python3 tests/test_extract.py
 python3 tests/test_human_tree.py
 # GPT/MBR partition-table identify + region map (synthetic + real-tool round-trip).
 python3 tests/test_partition.py
+# ESP32 partition-table region map + NVS identify/extract (synthetic, self-contained).
+python3 tests/test_esp32_part.py
+python3 tests/test_esp32_nvs.py
 # Legacy block filesystems: NILFS2/Minix/ReiserFS/UFS/APFS/LogFS identify (+ real mkfs.minix).
 python3 tests/test_legacy_fs.py
 # LUKS1/LUKS2 identify with header parameters (synthetic + real cryptsetup).

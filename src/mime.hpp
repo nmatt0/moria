@@ -79,6 +79,9 @@ inline const char* mime_for_type(const std::string& t) {
     // --- partition tables -------------------------------------------------
     if (t == "gpt") return "application/x-gpt";
     if (t == "mbr") return "application/x-mbr";
+    if (t == "esp32_partition_table") return "application/x-esp32-partition-table";
+    // --- embedded key/value stores ------------------------------------------
+    if (t == "esp32_nvs") return "application/x-esp32-nvs";
     // --- encrypted volumes ------------------------------------------------
     if (t == "luks1" || t == "luks2") return "application/x-luks";
     return "application/octet-stream";

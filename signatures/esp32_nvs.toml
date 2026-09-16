@@ -1,0 +1,30 @@
+name = "esp32_nvs"
+category = "container"
+
+# ESP-IDF NVS (non-volatile storage) key/value partition: a log of 4 KiB pages,
+# each a 32-byte state header + entry state bitmap + 126 x 32-byte entries.
+# There is no format magic, so the signature anchors on the page state words
+# (active 0xFFFFFFFE, full 0xFFFFFFFC, erasing 0xFFFFFFF8, stored LE) and the
+# validator is the filter: version byte + 0xFF header padding, a CRC32 over the
+# header, sane entry bitmap, and every bitmap-written entry passing its own
+# CRC32 and span checks. The finding spans the run of consistent pages;
+# WiFi-password / token / key-looking entries are flagged as diagnostics.
+validator = "esp32_nvs"
+confidence = "structural"   # the validator raises this to verified on CRC match
+
+[[magic]]
+hex = "feffffff"   # page state: active (LE)
+endian = "little"
+[[magic]]
+hex = "fcffffff"   # page state: full (LE)
+endian = "little"
+[[magic]]
+hex = "f8ffffff"   # page state: erasing (LE)
+endian = "little"
+
+[doc]
+description = "ESP-IDF NVS key/value store: per-device configuration on ESP32-family flash (WiFi credentials, provisioning data, device keys)."
+vendor = "Espressif"
+references = [
+  { title = "ESP-IDF Non-Volatile Storage Library", url = "https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/nvs_flash.html" },
+]
