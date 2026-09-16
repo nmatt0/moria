@@ -62,6 +62,8 @@ add_executable(moria
   src/extract/iso9660.cpp
   src/extract/uimage.cpp
   src/extract/uboot_env.cpp
+  src/extract/esp32_nvs.cpp
+  src/esp32_nvs_parse.cpp
   src/extract/rae_rfp.cpp
   src/extract/lzari.cpp
   src/extract/vbf.cpp
@@ -118,6 +120,7 @@ add_executable(moria
   src/validators/dtb.cpp
   src/validators/partition.cpp
   src/validators/esp32_part.cpp
+  src/validators/esp32_nvs.cpp
   src/validators/legacy_fs.cpp
   src/validators/luks.cpp
 )

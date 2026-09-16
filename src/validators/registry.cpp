@@ -6,6 +6,7 @@
 #include "validators/dtb.hpp"
 #include "validators/elf.hpp"
 #include "validators/esp32_part.hpp"
+#include "validators/esp32_nvs.hpp"
 #include "validators/ihex.hpp"
 #include "validators/jffs2.hpp"
 #include "validators/jpeg.hpp"
@@ -53,6 +54,7 @@ Validator find_validator(const std::string& name) {
     if (name == "ubifs") return validate_ubifs;
     if (name == "gpt") return validate_gpt;
     if (name == "esp32_partition_table") return validate_esp32_partition_table;
+    if (name == "esp32_nvs") return validate_esp32_nvs;
     if (name == "mbr") return validate_mbr;
     if (name == "luks") return validate_luks;
     if (name == "nilfs2") return validate_nilfs2;
