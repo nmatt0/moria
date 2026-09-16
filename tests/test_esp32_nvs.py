@@ -57,9 +57,30 @@ HAPPY_EXPECT = {
     "app:f64": ("1024.0", "double"),
     "app:greeting": ("hello world", "string"),
     "app:longstr": ("A" * 200, "string"),
-    "app:blob1": (repr(bytes(range(100))), "blob"),
     "app:password": ("hunter2", "string"),
 }
+
+
+def blob_preview(data):
+    """Mirror of src/esp32_nvs_parse.cpp blob_preview(): text / <empty> / hex."""
+    n = len(data)
+    if n == 0 or (data[0] in (0x00, 0xFF) and all(c == data[0] for c in data)):
+        return "<empty, %dB>" % n
+    slen = 0
+    while slen < n and data[slen] != 0:
+        slen += 1
+    printable = sum(1 for c in data[:slen] if c in (9, 10, 13) or 0x20 <= c < 0x7f)
+    if slen >= 1 and printable * 10 >= slen * 9:
+        cap = min(slen, 200)
+        s = "".join(" " if data[i] in (9, 10, 13) else chr(data[i]) for i in range(cap))
+        if slen > cap:
+            s += "…"
+        return '"%s" (%dB)' % (s, n)
+    show = min(n, 24)
+    s = "hex:" + data[:show].hex()
+    if n > show:
+        s += "…"
+    return s + " (%dB)" % n
 
 
 def chained_partition():
@@ -96,6 +117,20 @@ def moria_json(data):
 
 def findings_of(data):
     return [f for f in moria_json(data)["findings"] if f["type"] == "esp32_nvs"]
+
+
+def read_blob(data, ns, key):
+    """Run moria -e and return the bytes of the extracted blobs/<ns>.<key>.bin."""
+    with tempfile.NamedTemporaryFile(suffix=".bin") as f, tempfile.TemporaryDirectory() as td:
+        f.write(data)
+        f.flush()
+        subprocess.run([MORIA, "-e", "-C", td, f.name], capture_output=True, timeout=120)
+        want = "%s.%s.bin" % (ns, key)
+        for root, _dirs, files in os.walk(td):
+            if want in files:
+                with open(os.path.join(root, want), "rb") as fh:
+                    return fh.read()
+    return None
 
 
 def extract_values(data):
@@ -145,17 +180,54 @@ def main():
         header, values = got
         missing = {k: v for k, v in HAPPY_EXPECT.items() if values.get(k) != v}
         check(not missing, f"happy: all values round-trip (mismatches: {missing or '{}'})")
+        # The v1 blob renders as the new triage preview (hex for binary data).
+        check(values.get("app:blob1") == (blob_preview(bytes(range(100))), "blob"),
+              f"happy: blob preview format (got {values.get('app:blob1')})")
         check(any("sensitive keys:" in h and "app:password" in h for h in header),
               "happy: sensitive key listed in header")
+        # The full blob bytes are written to a file, byte-exact.
+        raw = read_blob(happy, "app", "blob1")
+        check(raw == bytes(range(100)), "happy: blob written to blobs/ byte-exact")
+
+    # --- sensitive-key detection (issue #18 follow-up) ------------------------
+    # The credential-pattern list must catch the abbreviated WiFi keys real ESP32
+    # firmware uses (ssid/pwd/pswd/psk/pmk) and NOT false-positive on policy keys
+    # that merely contain "auth" (authmode / minauth).
+    import gen_samples as _gs
+    sens_page = _gs.nvs_page(0, [
+        _gs.nvs_namespace(1, "wifi"),
+        _gs.nvs_int(1, 0x01, "authmode", 3),   # must NOT be flagged
+        _gs.nvs_int(1, 0x01, "minauth", 0),     # must NOT be flagged
+        *_gs.nvs_varlen(1, 0x21, "xpwd", b"example-pw"),   # must be flagged (key name)
+        *_gs.nvs_varlen(1, 0x21, "xssid", b"ExampleNet"),  # must be flagged (key name)
+    ])
+    sf = findings_of(sens_page)
+    if sf:
+        msgs = " ".join(d["message"] for d in sf[0].get("diagnostics", []))
+        check("xpwd" in msgs and "xssid" in msgs, "sensitive: WiFi creds (xpwd/xssid) flagged")
+        check("authmode" not in msgs and "minauth" not in msgs,
+              f"sensitive: authmode/minauth NOT flagged (msgs: {msgs})")
+    # Human NOTES must collapse the repeated same-code tags into one "×N", not
+    # print the tag once per sensitive key.
+    with tempfile.NamedTemporaryFile(suffix=".bin") as tf:
+        tf.write(sens_page)
+        tf.flush()
+        human = subprocess.run([MORIA, tf.name], capture_output=True, text=True,
+                               env={**os.environ, "NO_COLOR": "1"}, timeout=60).stdout
+    ntags = human.count("sensitive-key")
+    check(ntags == 1 and "×2" in human,
+          f"sensitive: NOTES collapses repeated tags to ×N (saw {ntags} tag(s))")
 
     # --- chained v2 blob spanning pages ---------------------------------------
     chained = chained_partition()
     f = findings_of(chained)
     check(len(f) == 1 and f[0]["size"] == 2 * 4096, "chain: finding spans both pages")
     got = extract_values(chained)
-    expect = repr(bytes(range(128)))
+    expect = blob_preview(bytes(range(128)))
     check(got is not None and got[1].get("app:fw") == (expect, "blob"),
           "chain: cross-page blob reassembled" if got else "chain: no extraction")
+    check(read_blob(chained, "app", "fw") == bytes(range(128)),
+          "chain: reassembled blob written byte-exact")
 
     # --- erased page gap -------------------------------------------------------
     f = findings_of(gapped_partition())

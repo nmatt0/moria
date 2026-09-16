@@ -1,6 +1,7 @@
 // esp32_nvs.cpp — ESP-IDF NVS extraction. See esp32_nvs.hpp.
 #include "extract/esp32_nvs.hpp"
 
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -10,6 +11,15 @@
 #include "extract/safepath.hpp"
 
 namespace ft {
+
+namespace {
+// Filesystem-safe token from a namespace/key (for blob filenames).
+std::string safe_tok(const std::string& s) {
+    std::string o;
+    for (char c : s) o.push_back(std::isalnum(static_cast<unsigned char>(c)) ? c : '_');
+    return o.empty() ? "_" : o;
+}
+}  // namespace
 
 bool extract_esp32_nvs(const Reader& r, const Finding& f, SafeRoot& root,
                        const std::string& subdir, Extracted& out) {
@@ -64,6 +74,29 @@ bool extract_esp32_nvs(const Reader& r, const Finding& f, SafeRoot& root,
     }
     out.files = 1;
     out.bytes = bytes.size();
+
+    // Write each non-empty blob's full bytes to a file, so a recovered PEM key /
+    // cert / binary value survives intact (nvs-values.txt only holds a preview).
+    size_t blob_files = 0, sensitive = 0;
+    bool blobdir = false;
+    for (const auto& v : p.values) {
+        if (v.sensitive) ++sensitive;
+        if (v.raw.empty()) continue;
+        if (!blobdir) {
+            root.make_dir(subdir + "/blobs");
+            blobdir = true;
+        }
+        std::string rel =
+            subdir + "/blobs/" + safe_tok(v.ns) + "." + safe_tok(v.key) + ".bin";
+        if (root.write_file(rel, v.raw, 0644)) {
+            ++blob_files;
+            out.bytes += v.raw.size();
+        }
+    }
+    out.files += blob_files;
+    if (sensitive)
+        out.warnings.push_back(std::to_string(sensitive) + " sensitive key(s) (WiFi/creds/keys)");
+
     out.status = (p.bad_entries > 0 || !p.warnings.empty()) ? "partial" : "ok";
     return true;
 }

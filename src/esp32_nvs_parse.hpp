@@ -34,8 +34,11 @@ struct NvsValue {
     std::string ns;      // resolved namespace name ("#N" when undeclared)
     std::string key;
     uint8_t type = 0;    // NVS_STR / NVS_BLOB / ... (NVS_BLOB also for reassembled v2 blobs)
-    std::string text;    // display form: decimal, float, UTF-8 string, or python-style b'...'
+    std::string text;    // display form: decimal, float, UTF-8 string, blob preview
     bool sensitive = false;  // key matches the credential pattern
+    // Raw bytes of a blob value (empty for scalars/strings). The extractor writes
+    // these out as files so a recovered PEM key / cert survives intact.
+    std::vector<uint8_t> raw;
 };
 
 struct NvsParse {
@@ -66,8 +69,10 @@ bool nvs_page_erased(const Reader& r, size_t off);
 // resolves namespaces, and reassembles string/blob values.
 NvsParse nvs_parse(const Reader& r, size_t off);
 
-// True when a key looks credential-bearing (password, passwd, token, secret,
-// key, auth, credential — case-insensitive substring).
+// True when a key looks credential-bearing: a case-insensitive substring match
+// against password/passwd/pswd/pwd/ssid/psk/pmk/token/secret/key/cred/private key
+// needles (chosen to catch real ESP32 WiFi keys like sta.ssid/sta.pswd/xpwd while
+// not matching non-secret policy keys such as authmode/minauth).
 bool nvs_key_sensitive(const std::string& key);
 
 const char* nvs_type_name(uint8_t type);
