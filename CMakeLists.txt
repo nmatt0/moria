@@ -215,6 +215,8 @@ if(Python3_Interpreter_FOUND)
     test_extract
     test_human_tree
     test_partition
+    test_esp32_part
+    test_esp32_nvs
     test_legacy_fs
     test_luks
     test_rae_rfp
