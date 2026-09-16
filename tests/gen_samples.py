@@ -801,6 +801,43 @@ def mbr_disk():
     return bytes(buf)
 
 
+def luks1_hdr():
+    """A LUKS1 phdr (big-endian): aes-xts-plain64, sha256, 512-bit master key."""
+    import struct
+    b = bytearray(4096)
+    b[0:6] = b"LUKS\xba\xbe"
+    struct.pack_into(">H", b, 6, 1)                # version
+    b[0x08:0x08 + 3] = b"aes"                      # cipher-name
+    b[0x28:0x28 + 11] = b"xts-plain64"            # cipher-mode
+    b[0x48:0x48 + 6] = b"sha256"                  # hash spec
+    struct.pack_into(">I", b, 0x68, 4096)         # payload offset (sectors)
+    struct.pack_into(">I", b, 0x6C, 64)           # master-key bytes (512-bit)
+    uuid = b"12345678-1234-1234-1234-123456789abc"
+    b[0xA8:0xA8 + len(uuid)] = uuid
+    return bytes(b)
+
+
+def luks2_hdr():
+    """A LUKS2 binary header + JSON metadata (aes-xts-plain64, argon2id, 512-bit)."""
+    import struct
+    hdr_size = 16384
+    b = bytearray(hdr_size)
+    b[0:6] = b"LUKS\xba\xbe"
+    struct.pack_into(">H", b, 6, 2)                # version
+    struct.pack_into(">Q", b, 8, hdr_size)        # hdr_size
+    b[0x48:0x48 + 6] = b"sha256"                  # checksum alg
+    uuid = b"eb43f8ab-cc9b-4cc0-a469-df5a35bcae82"
+    b[0xA8:0xA8 + len(uuid)] = uuid
+    struct.pack_into(">Q", b, 0x100, 0)           # hdr_offset (0 = primary)
+    js = (b'{"keyslots":{"0":{"type":"luks2","key_size":64,'
+          b'"kdf":{"type":"argon2id","time":4,"memory":1048576}}},'
+          b'"segments":{"0":{"type":"crypt","offset":"16777216",'
+          b'"encryption":"aes-xts-plain64","sector_size":512}},'
+          b'"digests":{"0":{"type":"pbkdf2"}}}')
+    b[0x1000:0x1000 + len(js)] = js
+    return bytes(b)
+
+
 # name -> (builder, expected_type or None, min_confidence)
 def _sb_image(total, sb_off, fields):
     """A zero image of `total` bytes with (offset, struct-format, value) tuples
@@ -892,6 +929,8 @@ MANIFEST = [
     ("ufs.bin", ufs_sb, "ufs", CONSISTENT),
     ("apfs.bin", apfs_sb, "apfs", CONSISTENT),
     ("logfs.bin", logfs_sb, "logfs", CONSISTENT),
+    ("luks1.bin", luks1_hdr, "luks1", CONSISTENT),
+    ("luks2.bin", luks2_hdr, "luks2", CONSISTENT),
     ("squashfs_v4_le.bin", squashfs_v4_le, "squashfs", CONSISTENT),
     ("squashfs_v3_le.bin", squashfs_v3_le, "squashfs_legacy", STRUCTURAL),
     ("squashfs_shsq.bin", squashfs_shsq, "squashfs", STRUCTURAL),
