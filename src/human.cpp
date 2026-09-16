@@ -102,14 +102,32 @@ std::string notes_for(const Finding& f, const Palette& p, bool verbose = false) 
         s += (s.empty() ? "" : "  ") + ("\"" + clean_label(f.label, 40, verbose) + "\"");
     // Terse per-finding diagnostic tags, e.g. "[warn: no-oob]". The short tag is
     // the code with a redundant leading "<type>-" stripped; the full message is
-    // in the diagnostics section.
+    // in the diagnostics section. Identical tags are collapsed to one with a count
+    // (e.g. "[warn: sensitive-key ×12]") so a finding with many same-code
+    // diagnostics — an NVS partition full of credential keys — doesn't flood NOTES.
+    std::vector<std::pair<std::string, const Diagnostic*>> seen;  // tag -> first diag, in order
+    std::vector<size_t> counts;
     for (const auto& d : f.diagnostics) {
         std::string tag = d.code;
         std::string pfx = f.type + "-";
         if (tag.rfind(pfx, 0) == 0) tag = tag.substr(pfx.size());
+        size_t j = 0;
+        for (; j < seen.size(); ++j)
+            if (seen[j].first == tag && seen[j].second->severity == d.severity) break;
+        if (j == seen.size()) {
+            seen.push_back({tag, &d});
+            counts.push_back(1);
+        } else {
+            ++counts[j];
+        }
+    }
+    for (size_t j = 0; j < seen.size(); ++j) {
+        const Diagnostic& d = *seen[j].second;
         std::string sev = d.severity == "error" ? "err" : d.severity == "warning" ? "warn" : "info";
+        std::string body = sev + ": " + seen[j].first;
+        if (counts[j] > 1) body += " ×" + std::to_string(counts[j]);  // ×N
         s += (s.empty() ? "" : " ");
-        s += p.sev(d.severity) + ("[" + sev + ": " + tag + "]") + p.reset();
+        s += p.sev(d.severity) + ("[" + body + "]") + p.reset();
     }
     return s;
 }

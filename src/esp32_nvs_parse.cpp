@@ -42,28 +42,49 @@ std::string key_of(std::span<const uint8_t> e) {
     return s;
 }
 
-// python-style bytes repr: b'...' with \\, \t, \n, \r, \' and \xNN escapes.
-std::string bytes_repr(std::span<const uint8_t> d) {
-    std::string s = "b'";
-    char hex[5];
-    for (uint8_t c : d) {
-        switch (c) {
-            case '\\': s += "\\\\"; break;
-            case '\'': s += "\\'"; break;
-            case '\t': s += "\\t"; break;
-            case '\n': s += "\\n"; break;
-            case '\r': s += "\\r"; break;
-            default:
-                if (c >= 0x20 && c < 0x7F) {
-                    s.push_back(static_cast<char>(c));
-                } else {
-                    std::snprintf(hex, sizeof(hex), "\\x%02x", c);
-                    s += hex;
-                }
-        }
+// True when a blob is all 0x00 or all 0xFF (erased / never-written flash).
+bool blob_empty(std::span<const uint8_t> d) {
+    if (d.empty()) return true;
+    uint8_t first = d[0];
+    if (first != 0x00 && first != 0xFF) return false;
+    for (uint8_t c : d)
+        if (c != first) return false;
+    return true;
+}
+
+// Triage-friendly blob display: a mostly-printable blob (WiFi creds, a PEM key,
+// a version string) renders as quoted text up to the first NUL; an all-0x00/0xFF
+// blob as <empty>; anything else as a short hex preview with the length. The full
+// bytes are written to a file by the extractor, so this stays a preview.
+std::string blob_preview(std::span<const uint8_t> d) {
+    const size_t len = d.size();
+    if (blob_empty(d)) return "<empty, " + std::to_string(len) + "B>";
+    size_t slen = 0;
+    while (slen < len && d[slen] != 0) ++slen;
+    size_t printable = 0;
+    for (size_t i = 0; i < slen; ++i) {
+        uint8_t c = d[i];
+        if (c == 0x09 || c == 0x0a || c == 0x0d || (c >= 0x20 && c < 0x7f)) ++printable;
     }
-    s.push_back('\'');
-    return s;
+    if (slen >= 1 && printable * 10 >= slen * 9) {  // >=90% printable text
+        std::string s;
+        size_t cap = slen < 200 ? slen : 200;
+        for (size_t i = 0; i < cap; ++i) {
+            uint8_t c = d[i];
+            s.push_back((c == 0x0a || c == 0x0d || c == 0x09) ? ' ' : static_cast<char>(c));
+        }
+        if (slen > cap) s += "…";
+        return "\"" + s + "\" (" + std::to_string(len) + "B)";
+    }
+    std::string s = "hex:";
+    size_t show = len < 24 ? len : 24;
+    char hx[3];
+    for (size_t i = 0; i < show; ++i) {
+        std::snprintf(hx, sizeof(hx), "%02x", d[i]);
+        s += hx;
+    }
+    if (len > show) s += "…";
+    return s + " (" + std::to_string(len) + "B)";
 }
 
 // UTF-8 with invalid sequences replaced by U+FFFD (deterministic).
@@ -167,8 +188,14 @@ bool nvs_page_erased(const Reader& r, size_t off) {
 }
 
 bool nvs_key_sensitive(const std::string& key) {
-    static const char* kNeedles[] = {"password", "passwd", "token", "secret",
-                                     "key",      "auth",   "credential"};
+    // Substring needles that flag a key holding a secret. Chosen against real ESP32
+    // NVS layouts: the WiFi driver stores credentials under abbreviated keys
+    // (sta.ssid, sta.pswd, ap.passwd, sta.pmk, xssid, xpwd), so "ssid"/"pwd"/"pswd"/
+    // "psk"/"pmk" must be covered. "auth" is deliberately NOT a needle — it only
+    // matches non-secret policy keys (sta.authmode, ap.authmode, sta.minauth).
+    static const char* kNeedles[] = {"password", "passwd", "pswd", "pwd",  "ssid",
+                                     "psk",      "pmk",    "token", "secret", "key",
+                                     "cred",     "privat", "priv_", "seckey"};
     std::string lower;
     lower.reserve(key.size());
     for (char c : key) lower.push_back(is_upper(c) ? static_cast<char>(c + 32) : c);
@@ -273,6 +300,23 @@ NvsParse nvs_parse(const Reader& r, size_t off) {
         res.values.push_back(std::move(v));
         res.keys++;
     };
+    // A blob: preview inline, retain the raw bytes so the extractor can write the
+    // full value to a file (unless it is erased/empty flash).
+    auto push_blob = [&](uint8_t ns, std::string key, std::span<const uint8_t> bytes) {
+        if (res.values.size() >= kMaxValues) {
+            res.capped = true;
+            return;
+        }
+        NvsValue v;
+        v.ns = ns_name(ns);
+        v.key = std::move(key);
+        v.type = NVS_BLOB;
+        v.text = blob_preview(bytes);
+        v.sensitive = nvs_key_sensitive(v.key);
+        if (!blob_empty(bytes)) v.raw.assign(bytes.begin(), bytes.end());
+        res.values.push_back(std::move(v));
+        res.keys++;
+    };
 
     for (size_t page : pages) {
         for (size_t i = 0; i < kEntriesPerPage;) {
@@ -353,7 +397,7 @@ NvsParse nvs_parse(const Reader& r, size_t off) {
                         while (!b.empty() && b.back() == 0) b.pop_back();
                         push_value(ns, key, type, utf8_lossy(b));
                     } else {
-                        push_value(ns, key, type, bytes_repr(vd.bytes));
+                        push_blob(ns, key, vd.bytes);
                     }
                     break;
                 }
@@ -416,7 +460,7 @@ NvsParse nvs_parse(const Reader& r, size_t off) {
         if (found != p.chunk_count)
             warn("blob " + p.key + ": " + std::to_string(found) + " of " +
                  std::to_string(p.chunk_count) + " chunks found");
-        push_value(p.ns, p.key, NVS_BLOB, bytes_repr(blob));
+        push_blob(p.ns, p.key, blob);
     }
     // Chunks with no referencing blob_index: emit standalone.
     for (const auto& c : chunks) {
@@ -428,7 +472,7 @@ NvsParse nvs_parse(const Reader& r, size_t off) {
                 break;
             }
         }
-        if (!referenced) push_value(c.ns, c.key, NVS_BLOB_DATA, bytes_repr(c.data.bytes));
+        if (!referenced) push_blob(c.ns, c.key, c.data.bytes);
     }
     return res;
 }
