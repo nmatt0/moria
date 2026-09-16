@@ -28,7 +28,10 @@ def coverage_gate():
     else be explicitly waived. Keeps the suite honest as signatures grow."""
     import glob
     import re
-    waived = set()  # none currently — all core sigs have fixtures
+    # minix_v3 is a second magic signature that feeds the shared "minix" validator
+    # (v3's s_magic sits at a different superblock offset), so its type is "minix",
+    # already covered by the minix fixture.
+    waived = {"minix_v3"}
     sig_names = set()
     for p in glob.glob(os.path.join(HERE, "..", "signatures", "*.toml")):
         m = re.search(r'(?m)^name\s*=\s*"([^"]+)"', open(p).read())

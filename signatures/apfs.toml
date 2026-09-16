@@ -1,0 +1,15 @@
+name = "apfs"
+category = "filesystem"
+
+# APFS container superblock (nx_superblock) at block 0; nx_magic "NXSB" at +0x20.
+magic_offset = 32
+validator = "apfs"
+confidence = "structural"
+
+[[magic]]
+ascii = "NXSB"
+endian = "little"
+
+[doc]
+description = "Apple File System (APFS) container."
+references = [ { title = "APFS reference", url = "https://developer.apple.com/support/downloads/Apple-File-System-Reference.pdf" } ]

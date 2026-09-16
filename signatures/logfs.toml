@@ -1,0 +1,15 @@
+name = "logfs"
+category = "filesystem"
+
+# LogFS superblock magic 0x7a3a8e5cb9d5bf67 (stored big-endian). The 8-byte magic
+# is essentially unique; LogFS was removed from Linux 4.10 and is near-zero in IoT.
+validator = "logfs"
+confidence = "structural"
+
+[[magic]]
+hex = "7a3a8e5cb9d5bf67"
+endian = "big"
+
+[doc]
+description = "LogFS (log-structured flash filesystem, deprecated)."
+references = [ { title = "LogFS", url = "https://en.wikipedia.org/wiki/LogFS" } ]
