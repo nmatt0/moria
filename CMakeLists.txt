@@ -125,6 +125,9 @@ add_executable(moria
   src/validators/esp32_part.cpp
   src/validators/esp32_nvs.cpp
   src/validators/legacy_fs.cpp
+  src/validators/littlefs.cpp
+  src/littlefs_parse.cpp
+  src/extract/littlefs.cpp
   src/validators/luks.cpp
 )
 target_include_directories(moria PRIVATE src third_party)
@@ -218,6 +221,7 @@ if(Python3_Interpreter_FOUND)
     test_extract
     test_human_tree
     test_partition
+    test_littlefs
     test_partition_overlap
     test_esp32_part
     test_esp32_nvs

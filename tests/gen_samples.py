@@ -1023,9 +1023,45 @@ def logfs_sb():
     return bytes(b)
 
 
+def littlefs_img():
+    """A minimal valid LittleFS image: block 0 holds the superblock commit (rev +
+    "littlefs" name tag + inline-struct geometry + CCRC). Enough for a verified
+    identify. Tags are 32-bit big-endian and XOR-chained (seed 0xffffffff); the
+    CCRC is crc32_raw(0xffffffff, region) == zlib.crc32(region) ^ 0xffffffff over
+    [rev .. ccrc tag]."""
+    bs, bcnt = 4096, 2
+    img = bytearray(b"\xff" * (bs * bcnt))
+    base = 0
+    region = bytearray()
+    struct.pack_into("<I", img, base, 1); region += struct.pack("<I", 1)   # rev = 1
+    off = 4
+    ptag = 0xFFFFFFFF
+
+    def emit_tag(tag, data):
+        nonlocal off, ptag, region
+        stored = tag ^ ptag
+        struct.pack_into(">I", img, base + off, stored)   # tags are big-endian
+        region += struct.pack(">I", stored)
+        img[base + off + 4:base + off + 4 + len(data)] = data
+        region += data
+        ptag = tag
+        off += 4 + len(data)
+
+    emit_tag((0x0FF << 20) | (0 << 10) | 8, b"littlefs")            # superblock name
+    inl = struct.pack("<6I", 0x00020001, bs, bcnt, 0xFF, 0x7FFFFFFF, 0x3FE)
+    emit_tag((0x201 << 20) | (0 << 10) | 24, inl)                   # inline geometry
+    ccrc = (0x500 << 20) | (0x3FF << 10) | 4                        # CCRC tag, size 4
+    stored = ccrc ^ ptag
+    struct.pack_into(">I", img, base + off, stored); region += struct.pack(">I", stored)
+    crc = zlib.crc32(bytes(region)) ^ 0xFFFFFFFF
+    struct.pack_into("<I", img, base + off + 4, crc)
+    return bytes(img)
+
+
 MANIFEST = [
     ("gpt.bin", gpt_disk, "gpt", VERIFIED),
     ("mbr.bin", mbr_disk, "mbr", CONSISTENT),
+    ("littlefs.bin", littlefs_img, "littlefs", VERIFIED),
     ("esp32_part.bin", esp32_part_table, "esp32_partition_table", CONSISTENT),
     ("esp32_nvs.bin", esp32_nvs_part, "esp32_nvs", VERIFIED),
     ("nilfs2.bin", nilfs2_sb, "nilfs2", VERIFIED),
