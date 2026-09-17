@@ -20,6 +20,8 @@ python3 tests/test_human_tree.py
 python3 tests/test_partition.py
 # LittleFS identify + byte-exact extract (synthetic + real mklittlefs round-trip).
 python3 tests/test_littlefs.py
+# Partition-boundary overrun: a stale finding must not hide a real partition (PR #33).
+python3 tests/test_partition_overlap.py
 # ESP32 partition-table region map + NVS identify/extract (synthetic, self-contained).
 python3 tests/test_esp32_part.py
 python3 tests/test_esp32_nvs.py
