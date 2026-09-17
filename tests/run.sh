@@ -18,6 +18,8 @@ python3 tests/test_extract.py
 python3 tests/test_human_tree.py
 # GPT/MBR partition-table identify + region map (synthetic + real-tool round-trip).
 python3 tests/test_partition.py
+# LittleFS identify + byte-exact extract (synthetic + real mklittlefs round-trip).
+python3 tests/test_littlefs.py
 # ESP32 partition-table region map + NVS identify/extract (synthetic, self-contained).
 python3 tests/test_esp32_part.py
 python3 tests/test_esp32_nvs.py

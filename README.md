@@ -67,3 +67,9 @@ moria does structural identification, extraction, and carving. Secret/credential
 ## License
 
 MIT, see `LICENSE`.
+
+Some on-disk format handling is a clean reimplementation of the algorithms in
+other open-source projects, written independently against moria's own I/O layer
+(no source copied): the UCL/NRV2B decompressor and CTO unfilters from UPX/UCL
+(GPL-2.0, algorithms only), and the metadata-commit and CTZ skip-list layout of
+[littlefs](https://github.com/littlefs-project/littlefs) (BSD-3-Clause).

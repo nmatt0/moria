@@ -28,6 +28,7 @@
 #include "extract/tar.hpp"
 #include "extract/yaffs2.hpp"
 #include "extract/ubifs.hpp"
+#include "extract/littlefs.hpp"
 #include "extract/uboot_env.hpp"
 #include "extract/esp32_nvs.hpp"
 #include "extract/uimage.hpp"
@@ -57,6 +58,7 @@ Extractor find_extractor(const std::string& type) {
     if (type == "ntfs" || type == "ntfs_filesystem") return extract_ntfs;
     if (type == "iso9660" || type == "iso") return extract_iso9660;
     if (type == "uimage") return extract_uimage;
+    if (type == "littlefs") return extract_littlefs;
     if (type == "uboot_env") return extract_uboot_env;
     if (type == "esp32_nvs") return extract_esp32_nvs;
     if (type == "rae_rfp") return extract_rae_rfp;

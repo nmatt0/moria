@@ -11,6 +11,7 @@
 #include "validators/jffs2.hpp"
 #include "validators/jpeg.hpp"
 #include "validators/legacy_fs.hpp"
+#include "validators/littlefs.hpp"
 #include "validators/luks.hpp"
 #include "validators/partition.hpp"
 #include "validators/rae_rfp.hpp"
@@ -63,6 +64,7 @@ Validator find_validator(const std::string& name) {
     if (name == "ufs") return validate_ufs;
     if (name == "apfs") return validate_apfs;
     if (name == "logfs") return validate_logfs;
+    if (name == "littlefs") return validate_littlefs;
     return nullptr;
 }
 

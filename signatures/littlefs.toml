@@ -1,0 +1,23 @@
+name = "littlefs"
+category = "filesystem"
+
+# LittleFS superblock: the ASCII magic "littlefs" sits at byte 8 of block 0 (it is
+# the data of the superblock name tag). magic_offset=8 anchors ctx.offset on the
+# block-0 (filesystem) start. The validator parses the superblock metadata pair,
+# verifies the commit CRC32, and reads the geometry (version, block_size,
+# block_count) from the inline-struct entry. Replaces the weak --broad
+# littlefs_superblock magic (0xf00ffff7 @4) with a validated, CRC-checked signature.
+magic_offset = 8
+validator = "littlefs"
+confidence = "structural"
+
+[[magic]]
+ascii = "littlefs"
+endian = "little"
+
+[doc]
+description = "LittleFS: power-fail-safe flash filesystem (Zephyr/Mbed/ESP-IDF/nRF/STM32 MCUs)."
+references = [
+  { title = "littlefs SPEC", url = "https://github.com/littlefs-project/littlefs/blob/master/SPEC.md" },
+  { title = "littlefs DESIGN", url = "https://github.com/littlefs-project/littlefs/blob/master/DESIGN.md" },
+]
