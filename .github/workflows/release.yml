@@ -37,6 +37,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # VERSION is the single source of truth (CMakeLists.txt and package.nix both
+      # read it). The git tag and debian/changelog carry the number independently,
+      # so fail the release if either drifts from VERSION rather than shipping a
+      # mislabeled artifact.
+      - name: Version consistency
+        run: |
+          ver="$(cat VERSION)"
+          if [ "v$ver" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::git tag $GITHUB_REF_NAME does not match VERSION (v$ver)"; exit 1
+          fi
+          deb="$(sed -n '1s/.*(\([^-)]*\).*/\1/p' debian/changelog)"
+          if [ "$deb" != "$ver" ]; then
+            echo "::error::debian/changelog version $deb does not match VERSION $ver"; exit 1
+          fi
+
       - name: Install build dependencies (apt)
         if: matrix.installer == 'apt'
         run: |

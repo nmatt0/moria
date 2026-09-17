@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
-project(moria VERSION 0.2.1 LANGUAGES CXX)
+# The version lives once, in the top-level VERSION file. package.nix reads the
+# same file; debian/changelog and the git tag are checked against it in CI.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VERSION_STRING)
+project(moria VERSION ${VERSION_STRING} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
