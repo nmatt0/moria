@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -582,6 +583,18 @@ int main(int argc, char** argv) {
     if (entropy) {
         regions = ft::unidentified_regions(reader, findings, 4096);
         ent = ft::whole_file_entropy(reader);
+        // Comprehensive per-section entropy: annotate every finding (and its
+        // located members / nested children) so the -E view shows an ENTROPY
+        // column across the whole OFFSET table, not just the unidentified gaps.
+        std::function<void(ft::Finding&)> annotate = [&](ft::Finding& f) {
+            if (f.size > 0) f.entropy = ft::region_entropy(reader, f.offset, f.size);
+            for (auto& m : f.members) {
+                if (m.offset != SIZE_MAX && m.size > 0)
+                    m.entropy = ft::region_entropy(reader, m.offset, m.size);
+                for (auto& c : m.children) annotate(c);
+            }
+        };
+        for (auto& f : findings) annotate(f);
     }
     std::string assessment = ft::assess_file(findings, fm.size(), regions, ent, entropy);
     if (hidden_interior > 0)

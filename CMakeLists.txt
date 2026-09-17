@@ -223,6 +223,7 @@ if(Python3_Interpreter_FOUND)
     test_partition
     test_littlefs
     test_partition_overlap
+    test_entropy
     test_esp32_part
     test_esp32_nvs
     test_legacy_fs

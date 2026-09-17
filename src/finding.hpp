@@ -62,6 +62,9 @@ struct Member {
     // GPT/MBR partition). SIZE_MAX = no offset (an archive member / UBI volume,
     // which has no single image offset); such members render name-only.
     size_t offset = SIZE_MAX;
+    // Shannon entropy (bits/byte, 0-8) over this member's byte range; computed
+    // only under -E for located members. <0 = not computed.
+    double entropy = -1.0;
 };
 
 struct Finding {
@@ -81,6 +84,10 @@ struct Finding {
     std::string label;  // format-specific name embedded in the data (e.g. uImage image name)
     std::string compression;
     std::string arch;
+
+    // Shannon entropy (bits/byte, 0-8) over this finding's byte range; computed
+    // only under -E. <0 = not computed (the default, so it is never emitted).
+    double entropy = -1.0;
 
     // Doc metadata (from the signature definition).
     std::string description;
