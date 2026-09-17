@@ -27,6 +27,16 @@ std::vector<Finding> resolve(std::vector<Finding> candidates, size_t file_size,
                              const std::set<std::string>& coalesce_types) {
     std::sort(candidates.begin(), candidates.end(), less);
 
+    // A partition table is authoritative about the medium's layout, so a finding
+    // starting exactly on a partition boundary is a real region, not interior
+    // noise — even when an earlier finding's self-declared size overruns it
+    // (see scan.cpp). Otherwise a stale superblock recording a pre-repartition
+    // size demotes every partition it spans to a footnote on itself.
+    std::set<size_t> part_starts;
+    for (const auto& f : candidates)
+        for (const auto& m : f.members)
+            if (m.offset != SIZE_MAX) part_starts.insert(m.offset);
+
     std::vector<Finding> kept;
     size_t owner_end = 0;  // end of the span owned by the current owner
     int owner = -1;        // index in `kept` of the owning region, or -1
@@ -38,7 +48,7 @@ std::vector<Finding> resolve(std::vector<Finding> candidates, size_t file_size,
             continue;
         }
         // Starts inside a region already owned by a confident, sized finding.
-        if (f.offset < owner_end) {
+        if (f.offset < owner_end && !part_starts.count(f.offset)) {
             if (owner >= 0) kept[owner].also_matched.push_back(demote(f));
             continue;
         }
