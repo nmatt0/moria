@@ -1,0 +1,22 @@
+name = "spiffs"
+category = "filesystem"
+
+# SPIFFS (ESP8266/ESP32-classic SPI-NOR filesystem) has no superblock magic. Anchor
+# on a committed object-index header: at a page boundary it is
+# span_ix=0x0000, flags=0xF8 (USED|FINAL|INDEX cleared), then 3 align zero-bytes,
+# giving the 6-byte pattern 00 00 F8 00 00 00 at page+2 (once per file). The
+# validator infers the page/block geometry over the image and confirms a coherent
+# object graph, so false anchors are rejected. Identify + extract; no CRC.
+magic_offset = 2
+validator = "spiffs"
+confidence = "structural"
+
+[[magic]]
+hex = "0000f8000000"
+endian = "little"
+
+[doc]
+description = "SPIFFS: SPI-NOR flash filesystem (ESP8266/ESP32-classic, small MCUs)."
+references = [
+  { title = "SPIFFS TECH_SPEC", url = "https://github.com/pellepl/spiffs/blob/master/docs/TECH_SPEC" },
+]

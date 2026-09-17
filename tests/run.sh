@@ -18,6 +18,8 @@ python3 tests/test_extract.py
 python3 tests/test_human_tree.py
 # GPT/MBR partition-table identify + region map (synthetic + real-tool round-trip).
 python3 tests/test_partition.py
+# SPIFFS identify + byte-exact extract (geometry inference; synthetic + real mkspiffs).
+python3 tests/test_spiffs.py
 # LittleFS identify + byte-exact extract (synthetic + real mklittlefs round-trip).
 python3 tests/test_littlefs.py
 # Partition-boundary overrun: a stale finding must not hide a real partition (PR #33).

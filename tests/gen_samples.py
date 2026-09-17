@@ -1058,10 +1058,33 @@ def littlefs_img():
     return bytes(img)
 
 
+def spiffs_img():
+    """A minimal valid SPIFFS image (page 256, block 4096, 2 blocks): one object
+    index header (flags 0xF8 = committed) for "/hello.txt" + one data page. The
+    struct region is zeroed (NUL-padded name) as a real writer leaves it."""
+    PAGE, BLOCK = 256, 4096
+    img = bytearray(b"\xff" * (BLOCK * 2))
+    p1 = PAGE                                   # page 1: object index header
+    struct.pack_into("<H", img, p1 + 0, 0x8001)  # obj_id: index flag + id 1
+    struct.pack_into("<H", img, p1 + 2, 0)       # span_ix 0
+    img[p1 + 4] = 0xF8                           # flags: USED|FINAL|INDEX cleared
+    img[p1 + 5:p1 + 13 + 32] = b"\x00" * (13 + 32 - 5)  # align + size + type + name region
+    struct.pack_into("<I", img, p1 + 8, 3)       # size = 3
+    img[p1 + 12] = 0x01                          # type = FILE
+    img[p1 + 13:p1 + 13 + 10] = b"/hello.txt"
+    p2 = 2 * PAGE                               # page 2: data page, span 0
+    struct.pack_into("<H", img, p2 + 0, 0x0001)  # obj_id (data)
+    struct.pack_into("<H", img, p2 + 2, 0)       # span 0
+    img[p2 + 4] = 0xFC                           # flags: USED|FINAL cleared (data)
+    img[p2 + 5:p2 + 8] = b"hi\n"                 # 3 data bytes after the 5-byte header
+    return bytes(img)
+
+
 MANIFEST = [
     ("gpt.bin", gpt_disk, "gpt", VERIFIED),
     ("mbr.bin", mbr_disk, "mbr", CONSISTENT),
     ("littlefs.bin", littlefs_img, "littlefs", VERIFIED),
+    ("spiffs.bin", spiffs_img, "spiffs", CONSISTENT),
     ("esp32_part.bin", esp32_part_table, "esp32_partition_table", CONSISTENT),
     ("esp32_nvs.bin", esp32_nvs_part, "esp32_nvs", VERIFIED),
     ("nilfs2.bin", nilfs2_sb, "nilfs2", VERIFIED),

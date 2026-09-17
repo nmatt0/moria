@@ -23,6 +23,7 @@
 #include "extract/jffs2.hpp"
 #include "extract/ntfs.hpp"
 #include "extract/rae_rfp.hpp"
+#include "extract/spiffs.hpp"
 #include "extract/squashfs.hpp"
 #include "extract/romfs.hpp"
 #include "extract/tar.hpp"
@@ -59,6 +60,7 @@ Extractor find_extractor(const std::string& type) {
     if (type == "iso9660" || type == "iso") return extract_iso9660;
     if (type == "uimage") return extract_uimage;
     if (type == "littlefs") return extract_littlefs;
+    if (type == "spiffs") return extract_spiffs;
     if (type == "uboot_env") return extract_uboot_env;
     if (type == "esp32_nvs") return extract_esp32_nvs;
     if (type == "rae_rfp") return extract_rae_rfp;
