@@ -125,6 +125,13 @@ std::vector<Finding> scan(const Reader& r, const std::vector<Signature>& sigs) {
     // Scan with skip-ahead: once a confident, sized finding claims a region,
     // restart the automaton past it so we neither validate nor traverse its
     // interior (the compressed blocks inside a squashfs, etc.).
+    // That size is self-declared, though, and can overrun a region the partition
+    // table already accounts for (a stale superblock in unpartitioned space
+    // still recording its pre-repartition size). Skipping the whole extent would
+    // step over those partitions' superblocks without ever validating them, so
+    // they would be missed entirely rather than demoted. Clamp the jump at the
+    // next partition start.
+    std::set<size_t> part_starts;  // absolute partition offsets seen so far
     std::vector<Finding> candidates;
     size_t next_scan = 0;
     while (next_scan < n) {
@@ -138,9 +145,18 @@ std::vector<Finding> scan(const Reader& r, const std::vector<Signature>& sigs) {
             if (!f) return true;
             const bool owns_region =
                 f->confidence >= static_cast<uint8_t>(Confidence::Structural) && f->size > 0;
-            const size_t end = f->offset + f->size;
+            const size_t foff = f->offset;
+            const size_t end = foff + f->size;
+            for (const auto& m : f->members)
+                if (m.offset != SIZE_MAX) part_starts.insert(m.offset);
             candidates.push_back(std::move(*f));
-            if (owns_region) { skip_to = end; return false; }
+            if (owns_region) {
+                size_t lim = end;
+                auto it = part_starts.upper_bound(foff);  // first boundary after it
+                if (it != part_starts.end() && *it < lim) lim = *it;
+                skip_to = lim;  // > foff >= next_scan, so the loop still advances
+                return false;
+            }
             return true;
         });
         if (skip_to > next_scan)
