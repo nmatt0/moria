@@ -41,7 +41,23 @@ struct Palette {
         if (s == "warning") return "\033[33m";   // yellow
         return "\033[2m";                        // info: faint
     }
+    // Entropy (bits/byte): high = likely encrypted/packed (red), mid = compressed
+    // (yellow), low = plain. Threshold 7.2 matches the -E "likely encrypted" hint.
+    const char* ent(double e) const {
+        if (!on) return "";
+        if (e >= 7.2) return "\033[31m";   // red
+        if (e >= 6.0) return "\033[33m";   // yellow
+        return "";
+    }
 };
+
+// "7.98", or empty when not computed (entropy < 0). Two decimals, fixed width.
+std::string ent_str(double e) {
+    if (e < 0) return {};
+    char b[16];
+    std::snprintf(b, sizeof(b), "%.2f", e);
+    return b;
+}
 
 std::string human_size(size_t n) {
     static const std::array<const char*, 5> unit{"B", "KB", "MB", "GB", "TB"};
@@ -295,7 +311,15 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
         }
         return w;
     };
+    // Under -E every sized finding is annotated with entropy, so show an ENTROPY
+    // column (between TIER and NOTES) whenever any row carries a computed value.
+    bool show_entropy = false;
+    for (const auto& r : rows) {
+        if (r.f && r.f->entropy >= 0) { show_entropy = true; break; }
+        if (r.mem && r.mem->entropy >= 0) { show_entropy = true; break; }
+    }
     size_t w_off = 6, w_size = 4, w_type = 4, w_tier = 4;
+    const size_t w_ent = 7;  // "ENTROPY"; values are "7.98"
     for (const auto& r : rows) {
         if (r.f) {
             w_off = std::max(w_off, disp_w(r.first));
@@ -317,6 +341,10 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
     col(h, "TYPE", w_type, "", "");
     h += "  ";
     col(h, "TIER", w_tier, "", "");
+    if (show_entropy) {
+        h += "  ";
+        col(h, "ENTROPY", w_ent, "", "");
+    }
     h += "  NOTES";
     o += h + p.reset() + "\n";
 
@@ -342,7 +370,15 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
             line += "  ";
             col(line, human_size(r.mem->size), w_size, "", "");
             line += "  ";
+            // A member has no TIER; under -E fill it blank so the ENTROPY column
+            // stays aligned with the finding rows.
             col(line, r.mem->note, w_type, p.dim(), p.reset());
+            if (show_entropy) {
+                line += "  ";
+                col(line, "", w_tier, "", "");  // blank TIER
+                line += "  ";
+                col(line, ent_str(r.mem->entropy), w_ent, p.ent(r.mem->entropy), p.reset());
+            }
             while (!line.empty() && line.back() == ' ') line.pop_back();
             o += line + "\n";
             continue;
@@ -358,6 +394,10 @@ void emit_findings_tree(std::string& o, const Palette& p, const std::vector<Find
         col(line, r.f->type, w_type, p.sec(*r.f), p.reset());
         line += "  ";
         col(line, r.f->confidence_tier, w_tier, p.tier(r.f->confidence_tier), p.reset());
+        if (show_entropy) {
+            line += "  ";
+            col(line, ent_str(r.f->entropy), w_ent, p.ent(r.f->entropy), p.reset());
+        }
         line += "  ";
         line += p.dim() + notes_for(*r.f, p, verbose) + p.reset();
         while (!line.empty() && line.back() == ' ') line.pop_back();

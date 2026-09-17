@@ -23,6 +23,10 @@ struct Region {
 // Whole-file entropy (sampled for large files to stay cheap).
 double whole_file_entropy(const Reader& r);
 
+// Shannon entropy (bits/byte, 0-8) over [off, off+len), sampling large ranges so
+// it stays cheap on a multi-GB finding. Used by the -E per-finding entropy column.
+double region_entropy(const Reader& r, size_t off, size_t len);
+
 // Byte ranges not covered by any structural finding, each with its
 // entropy. Only regions >= min_size are returned. Useful to flag encrypted or
 // compressed blobs the identifier didn't recognize.

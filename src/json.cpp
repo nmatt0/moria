@@ -56,6 +56,15 @@ void kv_num(std::string& o, const char* key, unsigned long long val, bool& first
     o += std::to_string(val);
 }
 
+// A double with 2 decimals (for the -E entropy field).
+void kv_double(std::string& o, const char* key, double val, bool& first) {
+    if (!first) o += ",";
+    first = false;
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "\"%s\":%.2f", key, val);
+    o += buf;
+}
+
 void emit_finding(std::string& o, const Finding& f, bool with_also_matched);
 
 void emit_finding(std::string& o, const Finding& f, bool with_also_matched) {
@@ -74,6 +83,7 @@ void emit_finding(std::string& o, const Finding& f, bool with_also_matched) {
     if (!f.label.empty()) kv_str(o, "label", f.label, first);
     if (!f.compression.empty()) kv_str(o, "compression", f.compression, first);
     if (!f.arch.empty()) kv_str(o, "arch", f.arch, first);
+    if (f.entropy >= 0) kv_double(o, "entropy", f.entropy, first);
 
     // Archive members (from --list) — emitted even in compact mode (the point of --list).
     if (!f.members.empty()) {
@@ -85,6 +95,11 @@ void emit_finding(std::string& o, const Finding& f, bool with_also_matched) {
             o += "\",\"size\":" + std::to_string(f.members[i].size);
             if (f.members[i].offset != SIZE_MAX)
                 o += ",\"offset\":" + std::to_string(f.members[i].offset);
+            if (f.members[i].entropy >= 0) {
+                char eb[32];
+                std::snprintf(eb, sizeof(eb), ",\"entropy\":%.2f", f.members[i].entropy);
+                o += eb;
+            }
             if (!f.members[i].note.empty()) {
                 o += ",\"note\":\"";
                 escape_to(o, f.members[i].note);

@@ -9,6 +9,7 @@ namespace ft {
 
 namespace {
 constexpr double HIGH_ENTROPY = 7.2;  // >= this over a sizable region ⇒ likely encrypted/compressed
+}  // namespace
 
 // Entropy over [off,off+len), sampling if the region is large.
 double region_entropy(const Reader& r, size_t off, size_t len) {
@@ -28,8 +29,6 @@ double region_entropy(const Reader& r, size_t off, size_t len) {
     }
     return shannon_entropy(buf);
 }
-
-}  // namespace
 
 double whole_file_entropy(const Reader& r) { return region_entropy(r, 0, r.size()); }
 

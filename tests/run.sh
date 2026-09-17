@@ -22,6 +22,8 @@ python3 tests/test_partition.py
 python3 tests/test_littlefs.py
 # Partition-boundary overrun: a stale finding must not hide a real partition (PR #33).
 python3 tests/test_partition_overlap.py
+# -E per-section entropy column on findings + members (human + JSON).
+python3 tests/test_entropy.py
 # ESP32 partition-table region map + NVS identify/extract (synthetic, self-contained).
 python3 tests/test_esp32_part.py
 python3 tests/test_esp32_nvs.py
