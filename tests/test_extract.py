@@ -222,6 +222,66 @@ def test_ubifs(work, src, expected):
     return failures
 
 
+def test_ubi_sparse_volume(work):
+    """A UBI volume whose LEBs sit at sparse logical numbers (as a large, mostly
+    empty data volume produces) must reconstruct with EVERY LEB, including the
+    high-lnum ones. Regression: the reconstructor sized/placed LEBs by lnum and
+    clamped the image to the source size, silently dropping every LEB past it.
+    Self-contained: a hand-built 3-PEB UBI (no mkfs tools). Returns failures."""
+    import struct
+    import zlib
+
+    PEB, VIDOFF, DATAOFF = 0x20000, 2048, 4096
+    LEB = PEB - DATAOFF
+    crc = lambda b: zlib.crc32(b) & 0xffffffff
+
+    def ec():
+        h = bytearray(64)
+        h[0:4] = b"UBI#"; h[4] = 1
+        struct.pack_into(">I", h, 16, VIDOFF)
+        struct.pack_into(">I", h, 20, DATAOFF)
+        struct.pack_into(">I", h, 24, 0x12345678)
+        struct.pack_into(">I", h, 60, crc(bytes(h[0:60])))
+        return h
+
+    def vid(vol_id, lnum, sqnum):
+        h = bytearray(64)
+        h[0:4] = b"UBI!"; h[4] = 1; h[5] = 1  # version, vol_type=dynamic
+        struct.pack_into(">I", h, 8, vol_id)
+        struct.pack_into(">I", h, 12, lnum)
+        struct.pack_into(">Q", h, 40, sqnum)
+        struct.pack_into(">I", h, 60, crc(bytes(h[0:60])))
+        return h
+
+    def peb(vol_id, lnum, sqnum, marker):
+        p = bytearray(b"\xff" * PEB)
+        p[0:64] = ec()
+        p[VIDOFF:VIDOFF + 64] = vid(vol_id, lnum, sqnum)
+        p[DATAOFF:DATAOFF + LEB] = (marker * LEB)[:LEB]
+        return bytes(p)
+
+    # one volume, LEBs at lnum 0, 1, and 250 (sparse). The last is far past the
+    # 3-PEB image size, so the old size-clamp dropped it.
+    img = peb(1, 0, 10, b"LEB0") + peb(1, 1, 11, b"LEB1") + peb(1, 250, 12, b"LEBX")
+    src = os.path.join(work, "sparse_ubi.bin")
+    with open(src, "wb") as f:
+        f.write(img)
+    outdir = os.path.join(work, "sparse_ubi.out")
+    subprocess.run([MORIA, "--extract", "-C", outdir, src], capture_output=True)
+    blob = b""
+    for dp, _, fs in os.walk(outdir):
+        for f in fs:
+            if f.endswith(".img"):
+                with open(os.path.join(dp, f), "rb") as fh:
+                    blob += fh.read()
+    if b"LEB0" in blob and b"LEB1" in blob and b"LEBX" in blob:
+        print("PASS [ubi-sparse]: all LEBs recovered incl. the sparse high-lnum one")
+        return 0
+    print(f"FAIL [ubi-sparse]: LEB0={b'LEB0' in blob} LEB1={b'LEB1' in blob} "
+          f"LEBX(sparse)={b'LEBX' in blob}")
+    return 1
+
+
 def test_tar(work, src, expected):
     """Pack the tree with GNU tar (gnu/pax/ustar), extract with moria, compare.
     Needs `tar`. Exercises long names, prefix, and pax path records. Returns
@@ -1660,6 +1720,7 @@ def main():
         failures += test_ext(work, src, expected)
         failures += test_jffs2(work, src, expected)
         failures += test_ubifs(work, src, expected)
+        failures += test_ubi_sparse_volume(work)
         failures += test_tar(work, src, expected)
         failures += test_romfs(work, src, expected)
         failures += test_yaffs2(work, src, expected)
