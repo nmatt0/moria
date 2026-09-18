@@ -66,6 +66,7 @@ inline const char* mime_for_type(const std::string& t) {
     if (t == "apfs") return "application/x-apfs";
     if (t == "logfs") return "application/x-logfs";
     if (t == "littlefs") return "application/x-littlefs";
+    if (t == "spiffs") return "application/x-spiffs";
     // --- containers / firmware / bootloaders ------------------------------
     if (t == "android_boot") return "application/x-android-bootimg";
     if (t == "android_sparse") return "application/x-android-sparse";

@@ -127,6 +127,9 @@ add_executable(moria
   src/validators/legacy_fs.cpp
   src/validators/littlefs.cpp
   src/littlefs_parse.cpp
+  src/validators/spiffs.cpp
+  src/spiffs_parse.cpp
+  src/extract/spiffs.cpp
   src/extract/littlefs.cpp
   src/validators/luks.cpp
 )
@@ -222,6 +225,7 @@ if(Python3_Interpreter_FOUND)
     test_human_tree
     test_partition
     test_littlefs
+    test_spiffs
     test_partition_overlap
     test_entropy
     test_esp32_part
