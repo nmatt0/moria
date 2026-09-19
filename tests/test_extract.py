@@ -282,6 +282,164 @@ def test_ubi_sparse_volume(work):
     return 1
 
 
+def test_ubifs_orphan_recovery(work):
+    """A partial UBIFS capture missing its root LEB has no root inode 1 and no
+    dentry parented at root, so a tree-only walk from root yields nothing even
+    though valid inode/dentry/data nodes for real files are present. moria must
+    recover the unreachable content into a synthetic lost+found/. Self-contained:
+    a hand-built raw UBIFS (no mkfs tools, UBIFS node CRC = init 0xFFFFFFFF, no
+    final xor -> zlib.crc32(body) ^ 0xffffffff). Covers a named orphan subtree
+    (cat 1), a parent-link cycle (cat 2), a data-bearing lone inode (cat 3), and
+    the lone-inode content gate (a metadata-only inode must NOT emit a zero
+    shell). Returns failures."""
+    import struct
+    import zlib
+
+    ubicrc = lambda b: zlib.crc32(b) ^ 0xFFFFFFFF
+    S_IFDIR, S_IFREG = 0o40000, 0o100000
+
+    def node(ntype, body_after_ch, sqnum=1):
+        # body_after_ch is everything past the 24-byte common header; the node
+        # length is 24 + len(body_after_ch).
+        length = 24 + len(body_after_ch)
+        n = bytearray(length)
+        struct.pack_into("<I", n, 0, 0x06101831)   # magic
+        struct.pack_into("<Q", n, 8, sqnum)        # sqnum
+        struct.pack_into("<I", n, 16, length)      # len
+        n[20] = ntype
+        n[24:] = body_after_ch
+        struct.pack_into("<I", n, 4, ubicrc(bytes(n[8:])))  # crc over [8, len)
+        return bytes(n)
+
+    def sb():
+        return node(6, bytes(40))  # type 6, arbitrary body; identify anchor only
+
+    def ino(inum, mode, size):
+        # scanner reads: ino@24, size@48, mode@104, data_len@112. Keep data_len 0.
+        b = bytearray(160 - 24)
+        struct.pack_into("<I", b, 24 - 24, inum)
+        struct.pack_into("<Q", b, 48 - 24, size)
+        struct.pack_into("<I", b, 104 - 24, mode)
+        struct.pack_into("<I", b, 112 - 24, 0)
+        return node(0, bytes(b))
+
+    def dent(pino, inum, name):
+        nb = name.encode()
+        # scanner reads: pino@24, inum@40, nlen@50 (u16), name@56.
+        b = bytearray(56 - 24 + len(nb))
+        struct.pack_into("<I", b, 24 - 24, pino)
+        struct.pack_into("<Q", b, 40 - 24, inum)
+        struct.pack_into("<H", b, 50 - 24, len(nb))
+        b[56 - 24:] = nb
+        return node(2, bytes(b))
+
+    def data(inum, block, content):
+        # scanner reads: ino@24, block@28, osize@40 (u32), compr@44 (u16), data@48.
+        b = bytearray(48 - 24 + len(content))
+        struct.pack_into("<I", b, 24 - 24, inum)
+        struct.pack_into("<I", b, 28 - 24, block)
+        struct.pack_into("<I", b, 40 - 24, len(content))
+        struct.pack_into("<H", b, 44 - 24, 0)  # COMPR_NONE
+        b[48 - 24:] = content
+        return node(1, bytes(b))
+
+    c1 = b"orphan subtree file content\n"
+    c2 = b"lone inode with real data\n"
+    c3 = b"content reached only through a parent-link cycle\n"
+
+    nodes = [
+        sb(),
+        # cat 1: named orphan subtree — dir 100 -> orphan.txt (inode 101). No root.
+        ino(100, S_IFDIR | 0o755, 4096),
+        dent(100, 101, "orphan.txt"),
+        ino(101, S_IFREG | 0o644, len(c1)),
+        data(101, 0, c1),
+        # cat 3: data-bearing lone inode 200 (no dentry references it).
+        ino(200, S_IFREG | 0o644, len(c2)),
+        data(200, 0, c2),
+        # cat 3 gate: metadata-only lone inode 201 (no data node) must be skipped.
+        ino(201, S_IFREG | 0o644, 4096),
+        # cat 2: dirs 300<->301 each name the other (both are children, so neither
+        # is a subtree top); 301 also holds cyclefile (inode 302).
+        ino(300, S_IFDIR | 0o755, 4096),
+        ino(301, S_IFDIR | 0o755, 4096),
+        dent(300, 301, "b"),
+        dent(301, 300, "a"),
+        dent(301, 302, "cyclefile"),
+        ino(302, S_IFREG | 0o644, len(c3)),
+        data(302, 0, c3),
+    ]
+    img = bytearray()
+    for n in nodes:
+        img += n
+        if len(img) % 8:
+            img += b"\x00" * (8 - len(img) % 8)
+
+    src = os.path.join(work, "orphan.ubifs")
+    with open(src, "wb") as f:
+        f.write(img)
+    outdir = os.path.join(work, "orphan.out")
+    r = subprocess.run([MORIA, "-j", "--extract", "-C", outdir, src], capture_output=True)
+    try:
+        entry = json.loads(r.stdout.decode())["extraction"]["extracted"][0]
+    except Exception:
+        print(f"FAIL [ubifs-orphan]: no extraction manifest\n{r.stdout[:200]}")
+        return 1
+    root = os.path.join(outdir, entry["root"])
+
+    def rd(rel):
+        p = os.path.join(root, rel)
+        if not os.path.isfile(p):
+            return None
+        with open(p, "rb") as fh:
+            return fh.read()
+
+    failures = 0
+    lf = "lost+found"
+    checks = [
+        (os.path.join(lf, "inode_100", "orphan.txt"), c1, "named subtree (cat 1)"),
+        (os.path.join(lf, "inode_200"), c2, "data-bearing lone inode (cat 3)"),
+        (os.path.join(lf, "inode_300", "b", "cyclefile"), c3, "cyclic cluster (cat 2)"),
+    ]
+    for rel, want, label in checks:
+        if rd(rel) != want:
+            print(f"FAIL [ubifs-orphan]: {label} missing/wrong at {rel}")
+            failures += 1
+
+    # cat 3 gate: the metadata-only inode 201 must not extract a zero shell.
+    if os.path.exists(os.path.join(root, lf, "inode_201")):
+        print("FAIL [ubifs-orphan]: metadata-only inode_201 emitted a zero shell")
+        failures += 1
+
+    # No root inode -> everything is under lost+found, and status is partial.
+    strays = [os.path.join(dp, f) for dp, _, fs in os.walk(root) for f in fs
+              if lf not in os.path.relpath(os.path.join(dp, f), root).split(os.sep)]
+    if strays:
+        print(f"FAIL [ubifs-orphan]: files outside lost+found: {strays[:3]}")
+        failures += 1
+    if entry.get("status") != "partial":
+        print(f"FAIL [ubifs-orphan]: status={entry.get('status')!r}, expected 'partial'")
+        failures += 1
+
+    # The recovery must reach the human view, not just -j: the warning is surfaced
+    # on the finding row (extraction status/warning on a finding's own manifest
+    # node, and offset-fallback linkage for containers labelled by their inner FS).
+    h = subprocess.run([MORIA, "--extract", "-C", os.path.join(work, "orphan.hout"), src],
+                       capture_output=True).stdout
+    # terse tag on the finding/tree row, full sentence in the diagnostics table.
+    if b"lost+found" not in h:
+        print(f"FAIL [ubifs-orphan]: recovery not surfaced in human -e output\n{h[:300]}")
+        failures += 1
+    if b"diagnostics:" not in h or b"recovered" not in h:
+        print(f"FAIL [ubifs-orphan]: recovery detail not in diagnostics section\n{h[:400]}")
+        failures += 1
+
+    if not failures:
+        print("PASS [ubifs-orphan]: cat1 subtree + cat2 cycle + cat3 lone inode "
+              "recovered, zero-shell gated, status partial")
+    return failures
+
+
 def test_tar(work, src, expected):
     """Pack the tree with GNU tar (gnu/pax/ustar), extract with moria, compare.
     Needs `tar`. Exercises long names, prefix, and pax path records. Returns
@@ -1721,6 +1879,7 @@ def main():
         failures += test_jffs2(work, src, expected)
         failures += test_ubifs(work, src, expected)
         failures += test_ubi_sparse_volume(work)
+        failures += test_ubifs_orphan_recovery(work)
         failures += test_tar(work, src, expected)
         failures += test_romfs(work, src, expected)
         failures += test_yaffs2(work, src, expected)
