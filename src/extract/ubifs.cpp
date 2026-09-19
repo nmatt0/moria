@@ -152,22 +152,24 @@ std::map<uint32_t, std::vector<uint8_t>> deubi(const Reader& r, uint64_t base, b
 
     for (auto& [vol_id, lebs] : map) {
         if (lebs.empty()) continue;
-        uint32_t max_lnum = lebs.rbegin()->first;
-        uint64_t total = uint64_t(max_lnum + 1) * (leb_len_common ? leb_len_common : 0);
-        // A real volume cannot hold more data than the source image (its LEBs
-        // live in PEBs within it). A corrupt/mutated lnum otherwise balloons the
-        // reconstructed image — e.g. a 256 KB input with one stray lnum=8000
-        // would allocate tens of MB (up to MAX_VOLUME_BYTES) of mostly-zero
-        // padding: a memory/disk amplification bomb whose huge mmap later faults.
+        // Pack the volume's LEBs contiguously in logical (lnum ascending) order.
+        // The UBIFS node scanner locates nodes by magic + CRC, so their exact
+        // lnum*leb_len positions are not needed. Sizing/placing by lnum instead
+        // was both wasteful and, for a *sparse* volume (few LEBs at high lnums,
+        // as a large mostly-empty data volume produces), forced a clamp to the
+        // source size that silently dropped every LEB past it. Sizing by the
+        // actual LEB count keeps every LEB and is inherently bomb-proof: a stray
+        // lnum can no longer balloon the image (its cost is one LEB, not its
+        // logical offset).
+        uint64_t total = uint64_t(lebs.size()) * (leb_len_common ? leb_len_common : 0);
         if (total == 0 || total > MAX_VOLUME_BYTES) { truncated = true; continue; }
-        if (total > r.size()) { total = r.size(); truncated = true; }  // clamp the bomb
         std::vector<uint8_t>& img = volumes[vol_id];
-        img.assign(total, 0);
+        img.reserve(total);
         for (auto& [lnum, leb] : lebs) {
+            (void)lnum;
             auto span = r.bytes(leb.off, leb.len);
             if (!span) { truncated = true; continue; }
-            uint64_t dst = uint64_t(lnum) * leb.len;
-            if (dst + leb.len <= img.size()) std::memcpy(img.data() + dst, span->data(), leb.len);
+            img.insert(img.end(), span->begin(), span->end());
         }
     }
     return volumes;

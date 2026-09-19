@@ -149,7 +149,12 @@ bool lzo1x_decompress_safe(const uint8_t* in, size_t in_len, uint8_t* out, size_
         if (t >= 16) goto match;
         {
             if (!in_avail(1)) return false;
-            size_t off = 1 + 0x0800 + (t >> 2) + (static_cast<size_t>(*ip++) << 2);
+            // A short match FOLLOWING a match (length 2) uses a base distance of 1.
+            // Only the short match after a *literal run* (after_literal_run, length
+            // 3) adds the 0x0800 (M2_MAX_OFFSET) base -- that offset must NOT be
+            // applied here, or every match-after-match back-reference is 2048 too
+            // far and copy_match fails (aborting the whole block).
+            size_t off = 1 + (t >> 2) + (static_cast<size_t>(*ip++) << 2);
             if (!copy_match(off, 2)) return false;
         }
         goto match_done;
