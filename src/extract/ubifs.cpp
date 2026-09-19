@@ -97,6 +97,7 @@ struct Ctx {
     std::map<uint32_t, InodeInfo> inodes{};
     std::map<uint32_t, std::vector<Dent>> dents{};  // keyed by parent inode
     std::set<uint32_t> stack{};
+    std::set<uint32_t> visited{};   // inodes reached by the root walk (orphan detection)
 };
 
 std::optional<uint32_t> le32(const Reader& r, uint64_t o) { return r.at<uint32_t>(o, Endian::Little); }
@@ -284,6 +285,7 @@ void walk_dir(Ctx& c, uint32_t pino, const std::string& rel, size_t depth) {
     if (depth > MAX_DEPTH) { c.truncated = true; return; }
     if (c.stack.count(pino)) return;
     c.stack.insert(pino);
+    c.visited.insert(pino);
     auto it = c.dents.find(pino);
     if (it != c.dents.end()) {
         std::map<std::string, const Dent*> best;
@@ -310,6 +312,7 @@ void walk_dir(Ctx& c, uint32_t pino, const std::string& rel, size_t depth) {
 void write_inode(Ctx& c, uint32_t ino, const std::string& rel) {
     auto it = c.inodes.find(ino);
     if (it == c.inodes.end()) { c.truncated = true; return; }
+    c.visited.insert(ino);
     const InodeInfo& in = it->second;
     const uint32_t type = in.mode & S_IFMT;
     const std::string full = c.subdir + "/" + rel;
@@ -332,12 +335,91 @@ void write_inode(Ctx& c, uint32_t ino, const std::string& rel) {
     }
 }
 
+// Recover inodes the root walk never reached. moria is a best-effort recovery
+// tool, not a forensic one: a partial capture whose root LEB is missing (common
+// in flash dumps) still holds valid inode/dentry/data nodes for real files, and
+// dropping them the way a tree-only walker does is the failure mode this exists
+// to avoid. Everything unreachable from root inode 1 is re-rooted under a
+// synthetic lost+found/ so it lands on disk anyway. Gated so a healthy image
+// with no orphans produces no lost+found/.
+void recover_orphans(Ctx& c) {
+    // Every inode named as a child by some dentry. A parent that is itself a
+    // child is reachable through that other dentry, so it is not a subtree top.
+    std::set<uint32_t> child_inodes;
+    for (auto& [pino, dvec] : c.dents)
+        for (auto& d : dvec)
+            if (d.inum <= 0xffffffffull) child_inodes.insert(static_cast<uint32_t>(d.inum));
+
+    const std::string lf = "lost+found";
+    const size_t f0 = c.out.files, d0 = c.out.dirs, s0 = c.out.symlinks;
+    bool started = false;
+    auto ensure_lf = [&]() {
+        if (!started) { c.root.make_dir(c.subdir + "/" + lf); started = true; }
+    };
+
+    // 1. Orphan directory subtrees: a parent the root walk never reached and that
+    //    no dentry names as a child — the top of a dangling tree.
+    for (auto& [pino, dvec] : c.dents) {
+        (void)dvec;
+        if (c.visited.count(pino) || child_inodes.count(pino)) continue;
+        ensure_lf();
+        walk_dir(c, pino, lf + "/inode_" + std::to_string(pino), 0);
+    }
+
+    // 2. Residual cyclic clusters: parents still unreached after (1) because every
+    //    member is a child of another member, so none qualified as a top. Walk them
+    //    anyway so a parent-link cycle can't make a whole subtree vanish.
+    for (auto& [pino, dvec] : c.dents) {
+        (void)dvec;
+        if (c.visited.count(pino)) continue;
+        ensure_lf();
+        walk_dir(c, pino, lf + "/inode_" + std::to_string(pino), 0);
+    }
+
+    // 3. Orphan lone inodes: a file/symlink with content but no dentry anywhere
+    //    (its directory entry was lost). Emit it named by inode so its data isn't
+    //    dropped. Require real content: with no name to carry information, a
+    //    metadata-only inode whose data nodes did not survive would extract as a
+    //    zero-filled shell (build_content fills holes with zero) — nothing dressed
+    //    up as a file. A named orphan (1/2) is always worth emitting; a nameless
+    //    one only when it carries data to recover.
+    for (auto& [ino, in] : c.inodes) {
+        if (c.visited.count(ino) || child_inodes.count(ino)) continue;
+        const uint32_t type = in.mode & S_IFMT;
+        const bool has_content = (type == S_IFREG && !in.data.empty()) ||
+                                 (type == S_IFLNK && !in.inline_data.empty());
+        if (!has_content) continue;
+        ensure_lf();
+        write_inode(c, ino, lf + "/inode_" + std::to_string(ino));
+    }
+
+    if (started) {
+        std::string parts;
+        auto add = [&](size_t n, std::string what) {
+            if (!n) return;
+            if (n == 1 && !what.empty() && what.back() == 's') what.pop_back();  // singular
+            if (!parts.empty()) parts += ", ";
+            parts += std::to_string(n) + " " + what;
+        };
+        add(c.out.files - f0, "files");
+        add(c.out.dirs - d0, "dirs");
+        add(c.out.symlinks - s0, "symlinks");
+        c.out.warnings.push_back("recovered " + parts +
+                                 " unreachable from root inode into lost+found/");
+    }
+}
+
 // Parse one UBIFS image (Reader over the volume) into `root/subdir`.
 void parse_ubifs(const Reader& img, SafeRoot& root, const std::string& subdir, Extracted& out,
                  bool& truncated) {
     Ctx c{img, 0, img.size(), root, subdir, out};
     scan_nodes(c);
+    // A capture missing its root LEB has neither a root inode node nor any dentry
+    // parented at root; the extraction is then inherently partial (recovery only).
+    const bool root_present = c.inodes.count(UBIFS_ROOT_INO) || c.dents.count(UBIFS_ROOT_INO);
     walk_dir(c, UBIFS_ROOT_INO, "", 0);
+    recover_orphans(c);
+    if (!root_present) c.truncated = true;
     if (c.truncated) truncated = true;
 }
 

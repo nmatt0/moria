@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <map>
 #include <set>
@@ -425,6 +426,50 @@ std::vector<DiagRow> gather_diagnostics(const std::vector<Finding>& fs) {
     return rows;
 }
 
+// Every manifest root begins with the top-level "0x<hex>-<type>" dir; that hex is
+// the container's offset in the input file — the useful offset for a nested entry,
+// whose own e.offset is relative to its parent payload.
+size_t parse_root_offset(const std::string& root) {
+    if (root.size() > 2 && root[0] == '0' && (root[1] == 'x' || root[1] == 'X'))
+        return static_cast<size_t>(std::strtoull(root.c_str() + 2, nullptr, 16));
+    return 0;
+}
+
+// Compact identifier for a nested extraction: the deepest "<name>.extracted" path
+// segment minus the suffix (e.g. "vol_3.img"). Empty for a top-level entry.
+std::string extraction_label(const std::string& root) {
+    const std::string ext = ".extracted";
+    std::string best;
+    for (size_t start = 0; start <= root.size();) {
+        size_t slash = root.find('/', start);
+        size_t len = (slash == std::string::npos) ? root.size() - start : slash - start;
+        std::string seg = root.substr(start, len);
+        if (seg.size() > ext.size() && seg.compare(seg.size() - ext.size(), ext.size(), ext) == 0)
+            best = seg.substr(0, seg.size() - ext.size());
+        if (slash == std::string::npos) break;
+        start = slash + 1;
+    }
+    return best;
+}
+
+// Extraction-side trouble for the diagnostics table: every manifest entry's
+// warnings (e.g. a lost+found recovery) and hard statuses (error/unsupported).
+// This keeps the detail in one scannable place so the NOTES column stays terse.
+void gather_extraction_diags(std::vector<DiagRow>& rows, const Manifest& man) {
+    std::set<std::string> seen;  // dedupe identical severity+message
+    for (const auto& e : man.entries) {
+        const size_t off = parse_root_offset(e.root);
+        const std::string label = extraction_label(e.root);
+        auto add = [&](const std::string& sev, const std::string& msg) {
+            std::string full = label.empty() ? msg : label + ": " + msg;
+            if (!seen.insert(sev + "\x1f" + full).second) return;
+            rows.push_back({sev, "extract", e.type, full, off});
+        };
+        for (const auto& w : e.warnings) add("warning", w);
+        if (e.status != "ok" && e.status != "partial") add("error", e.status);
+    }
+}
+
 // The diagnostics section: a table SEVERITY | OFFSET | TYPE | MESSAGE listing
 // every finding's diagnostics. The single place to scan for trouble; the NOTES
 // column flags each in situ.
@@ -526,10 +571,19 @@ void emit_extraction_tree(std::string& o, const Palette& p, const std::vector<Fi
         });
 
     auto manifest_node_for = [&](const Finding& f) -> int {
-        for (size_t i = 0; i < n; ++i)
-            if (parent[i] < 0 && es[i].offset == f.offset && es[i].type == f.type)
-                return static_cast<int>(i);
-        return -1;
+        // Prefer an exact offset+type match; else fall back to a unique offset
+        // match, so a container whose top extraction entry is labelled by its inner
+        // filesystem (a `ubi` finding whose extraction entry is `ubifs`) still links
+        // to its subtree instead of dropping it from the human view.
+        int exact = -1, by_off = -1, off_count = 0;
+        for (size_t i = 0; i < n; ++i) {
+            if (parent[i] >= 0 || es[i].offset != f.offset) continue;
+            if (es[i].type == f.type) exact = static_cast<int>(i);
+            by_off = static_cast<int>(i);
+            ++off_count;
+        }
+        if (exact >= 0) return exact;
+        return off_count == 1 ? by_off : -1;
     };
 
     // Extraction-side NOTES: warnings, plus a bare status when it is not clean. A
@@ -541,7 +595,9 @@ void emit_extraction_tree(std::string& o, const Palette& p, const std::vector<Fi
         std::string s;
         for (const auto& w : e.warnings) {
             if (has_children && w.find("compression not decoded") != std::string::npos) continue;
-            s += (s.empty() ? "" : " · ") + w;
+            // Terse flag in NOTES; the full sentence goes to the diagnostics table.
+            std::string tag = (w.find("lost+found") != std::string::npos) ? "→ lost+found" : w;
+            s += (s.empty() ? "" : " · ") + tag;
         }
         if (e.status != "ok" && e.status != "partial")
             s += (s.empty() ? "" : " · ") + e.status;  // error:<why> / unsupported:<codec>
@@ -635,8 +691,16 @@ void emit_extraction_tree(std::string& o, const Palette& p, const std::vector<Fi
         r.type_str = f.type;
         r.tier_str = f.confidence_tier;
         r.notes_str = notes_for(f, p, verbose);
-        rows.push_back(r);
         int node = manifest_node_for(f);
+        // A finding's own extraction status/warning (e.g. a lost+found recovery on
+        // a rootless UBIFS, or a bare "partial") lives on its manifest node, not on
+        // a child, so surface it on the finding row itself — emit_kids only annotates
+        // descendant rows.
+        if (node >= 0) {
+            std::string exn = ex_notes(es[node], !kids[node].empty());
+            if (!exn.empty()) r.notes_str += (r.notes_str.empty() ? "" : "  ") + exn;
+        }
+        rows.push_back(r);
         if (node >= 0) emit_kids(node, "");
     }
 
@@ -707,19 +771,21 @@ std::string emit_file_human(const std::vector<Finding>& findings,
     Palette p{color};
     std::string o;
 
-    // Errors-only banner at the very top: a "moria could not do this" result
-    // must not be buried under a long findings table. Warnings/info live only in
-    // the diagnostics section and the NOTES column.
+    // Diagnostics drive an errors-only banner emitted lower down (just above the
+    // footer). Warnings/info live only in the diagnostics section and the NOTES
+    // column; extraction warnings/statuses are merged in below.
     auto diags = gather_diagnostics(findings);
+    if (extraction) {
+        gather_extraction_diags(diags, *extraction);
+        auto rank = [](const std::string& s) { return s == "error" ? 0 : s == "warning" ? 1 : 2; };
+        std::sort(diags.begin(), diags.end(), [&](const DiagRow& a, const DiagRow& b) {
+            if (rank(a.severity) != rank(b.severity)) return rank(a.severity) < rank(b.severity);
+            return a.offset < b.offset;
+        });
+    }
     size_t nerr = 0;
     for (const auto& d : diags)
         if (d.severity == "error") ++nerr;
-    if (nerr > 0) {
-        o += p.sev("error");
-        o += (nerr == 1 ? "! 1 error" : "! " + std::to_string(nerr) + " errors");
-        o += " — see diagnostics below\n\n";
-        o += p.reset();
-    }
 
     if (findings.empty()) {
         o += p.dim();
@@ -745,6 +811,18 @@ std::string emit_file_human(const std::vector<Finding>& findings,
                           r.entropy >= 7.2 ? "  (likely encrypted/compressed)" : "");
             o += buf;
         }
+    }
+
+    // Errors-only banner, just above the footer: a "moria could not do this"
+    // result sits right before the "-> extracted to ..." line so it is the last
+    // thing before the run summary, not buried at the top.
+    if (nerr > 0) {
+        o += "\n";
+        o += p.sev("error");
+        o += (nerr == 1 ? "! 1 error" : "! " + std::to_string(nerr) + " errors");
+        o += " — see diagnostics above";
+        o += p.reset();
+        o += "\n";
     }
 
     if (!footer.empty()) {
