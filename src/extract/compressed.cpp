@@ -19,6 +19,7 @@ constexpr uint64_t MAX_OUT = uint64_t(8) << 30;  // decompressed-size cap
 std::optional<Compressor> codec_for(const std::string& type) {
     if (type == "gzip") return Compressor::Gzip;
     if (type == "xz") return Compressor::Xz;
+    if (type == "lzma") return Compressor::Lzma;
     if (type == "zstd") return Compressor::Zstd;
     if (type == "lz4") return Compressor::Lz4;
     if (type == "lz4_legacy") return Compressor::Lz4Legacy;

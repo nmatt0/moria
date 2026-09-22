@@ -20,6 +20,7 @@ inline const char* mime_for_type(const std::string& t) {
     // --- registered IANA / de-facto standard types ------------------------
     if (t == "gzip") return "application/gzip";
     if (t == "xz") return "application/x-xz";
+    if (t == "lzma") return "application/x-lzma";
     if (t == "bzip2") return "application/x-bzip2";
     if (t == "zstd") return "application/zstd";
     if (t == "lz4" || t == "lz4_legacy") return "application/x-lz4";

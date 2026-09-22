@@ -275,7 +275,7 @@ void extract_findings(ft::Reader& reader, const std::vector<ft::Finding>& findin
         if (!ex) continue;
         if (f.type != "android_sparse" && f.offset < sparse_end) continue;
         const bool is_comp = f.type == "gzip" || f.type == "xz" || f.type == "zstd" ||
-                             f.type == "lz4";
+                             f.type == "lz4" || f.type == "lzma";
         if (!is_comp && f.offset < comp_end) continue;  // inside a compressed stream
         if (f.type == "jffs2") {
             if (f.offset >= jffs2_cov) continue;

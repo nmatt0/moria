@@ -335,6 +335,15 @@ def zstd():
     return bytes([0x28, 0xB5, 0x2F, 0xFD, 0x00]) + b"\0" * 16  # frame header descriptor, reserved bit 0
 
 
+def lzma_alone():
+    # A real legacy .lzma "alone" stream (props 0x5D, 8 MiB dict, size-unknown
+    # marker) that decodes to a clean end marker. Unlike the magic-only gzip/xz
+    # fixtures, the lzma validator trial-decodes, so the fixture must be genuine.
+    import lzma
+    payload = b"MORIA lzma alone fixture: the quick brown fox. " * 400
+    return lzma.compress(payload, format=lzma.FORMAT_ALONE)
+
+
 def cpio_newc():
     fields = ["00000000"] * 13
     fields[6] = "00000000"   # c_filesize
@@ -1122,6 +1131,7 @@ MANIFEST = [
     ("blob.lz4", lz4, "lz4", STRUCTURAL),
     ("blob.lz4l", lz4_legacy, "lz4_legacy", STRUCTURAL),
     ("blob.zst", zstd, "zstd", STRUCTURAL),
+    ("blob.lzma", lzma_alone, "lzma", VERIFIED),
     ("initramfs.cpio", cpio_newc, "cpio", CONSISTENT),
     ("archive.tar", tar, "tar", STRUCTURAL),
     ("archive.7z", sevenzip, "7z", STRUCTURAL),

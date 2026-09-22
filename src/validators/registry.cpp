@@ -13,6 +13,7 @@
 #include "validators/legacy_fs.hpp"
 #include "validators/littlefs.hpp"
 #include "validators/luks.hpp"
+#include "validators/lzma.hpp"
 #include "validators/partition.hpp"
 #include "validators/rae_rfp.hpp"
 #include "validators/spiffs.hpp"
@@ -67,6 +68,7 @@ Validator find_validator(const std::string& name) {
     if (name == "logfs") return validate_logfs;
     if (name == "littlefs") return validate_littlefs;
     if (name == "spiffs") return validate_spiffs;
+    if (name == "lzma") return validate_lzma;
     return nullptr;
 }
 

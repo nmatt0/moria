@@ -66,6 +66,19 @@ std::optional<std::vector<uint8_t>> upx_lzma_block_exact(std::span<const uint8_t
                                                          size_t out_len, uint8_t lc, uint8_t lp,
                                                          uint8_t pb);
 
+// Identify-time probe for a legacy standalone LZMA1 (".lzma alone") stream: the
+// FP-proof gate for a magicless format. Decodes `src` with the .lzma-alone
+// decoder, growing the output up to `out_cap` bytes, and succeeds ONLY if the
+// stream reaches its encoded end-of-stream marker (LZMA_STREAM_END). A random
+// header that happens to start `5D 00 00 ...` either errors in the range coder
+// or runs out of input without a valid end marker, so it fails here. On success
+// returns the decoded length and, via `in_consumed`, the exact compressed span
+// (so a caller can claim the region and stop the scan past it). Returns nullopt
+// on any decode error, on running out of input before the end marker, on
+// hitting `out_cap` before the end marker, or if liblzma was not compiled in.
+std::optional<uint64_t> lzma_alone_probe(std::span<const uint8_t> src, size_t out_cap,
+                                         size_t* in_consumed = nullptr);
+
 // Streaming decompression of a whole standalone stream/container whose decoded
 // size is not known in advance (a gzip/xz/zstd/lz4-frame firmware wrapper). Grows
 // the output buffer as it goes, stopping at `cap` bytes. Unlike decompress(),
