@@ -33,6 +33,8 @@ python3 tests/test_esp32_nvs.py
 python3 tests/test_legacy_fs.py
 # LUKS1/LUKS2 identify with header parameters (synthetic + real cryptsetup).
 python3 tests/test_luks.py
+# Legacy standalone .lzma identify (verified via trial-decode) + byte-exact extract + FP guards.
+python3 tests/test_lzma.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
 python3 tests/test_rae_rfp.py
 # VBF block extraction + LZSS decode round-trip (self-contained hard gate).

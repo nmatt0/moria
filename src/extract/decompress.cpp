@@ -241,6 +241,43 @@ std::optional<std::vector<uint8_t>> upx_lzma_block_exact(
 #endif
 }
 
+std::optional<uint64_t> lzma_alone_probe([[maybe_unused]] std::span<const uint8_t> src,
+                                         [[maybe_unused]] size_t out_cap,
+                                         [[maybe_unused]] size_t* in_consumed) {
+    if (in_consumed) *in_consumed = 0;
+#ifdef MORIA_HAVE_LZMA
+    if (src.size() < 13 || out_cap == 0) return std::nullopt;
+    lzma_stream s = LZMA_STREAM_INIT;
+    if (lzma_alone_decoder(&s, UINT64_MAX) != LZMA_OK) return std::nullopt;
+    s.next_in = src.data();
+    s.avail_in = src.size();
+    std::vector<uint8_t> out;
+    lzma_ret rc = LZMA_OK;
+    while (true) {
+        const size_t old = out.size();
+        if (old >= out_cap) { lzma_end(&s); return std::nullopt; }  // no end marker within cap
+        const size_t grow = std::min<size_t>(1u << 20, out_cap - old);
+        out.resize(old + grow);
+        s.next_out = out.data() + old;
+        s.avail_out = grow;
+        rc = lzma_code(&s, LZMA_FINISH);
+        out.resize(old + (grow - s.avail_out));
+        if (rc == LZMA_STREAM_END) break;         // clean end marker: a real stream
+        if (rc != LZMA_OK) { lzma_end(&s); return std::nullopt; }  // range-coder / data error
+        if (s.avail_out != 0 && s.avail_in == 0) {  // ran out of input, no end marker
+            lzma_end(&s);
+            return std::nullopt;
+        }
+    }
+    const uint64_t decoded = out.size();
+    if (in_consumed) *in_consumed = src.size() - s.avail_in;
+    lzma_end(&s);
+    return decoded;
+#else
+    return std::nullopt;
+#endif
+}
+
 namespace {
 
 #ifdef MORIA_HAVE_ZLIB

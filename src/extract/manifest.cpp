@@ -68,7 +68,8 @@ Extractor find_extractor(const std::string& type) {
     if (type == "vbmeta") return extract_vbmeta;
     if (type == "upx") return extract_upx;
     if (type == "fit") return extract_fit;
-    if (type == "gzip" || type == "xz" || type == "zstd" || type == "lz4" || type == "lz4_legacy")
+    if (type == "gzip" || type == "xz" || type == "zstd" || type == "lz4" || type == "lz4_legacy" ||
+        type == "lzma")
         return extract_compressed;
     if (type == "yaffs2") return extract_yaffs2;
     if (type == "ubifs" || type == "ubi") return extract_ubifs;

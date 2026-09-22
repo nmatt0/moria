@@ -132,6 +132,7 @@ add_executable(moria
   src/extract/spiffs.cpp
   src/extract/littlefs.cpp
   src/validators/luks.cpp
+  src/validators/lzma.cpp
 )
 target_include_directories(moria PRIVATE src third_party)
 target_compile_definitions(moria PRIVATE MORIA_VERSION="${PROJECT_VERSION}")
@@ -232,6 +233,7 @@ if(Python3_Interpreter_FOUND)
     test_esp32_nvs
     test_legacy_fs
     test_luks
+    test_lzma
     test_rae_rfp
     test_vbf
     test_uboot_env
