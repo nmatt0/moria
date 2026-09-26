@@ -50,7 +50,7 @@ Unpacked in-process, no external tools and no sudo:
 - **Filesystems:** SquashFS, ext2/3/4, F2FS, FAT12/16/32, exFAT, NTFS, HFS+/HFSX, XFS, btrfs, JFFS2, UBI/UBIFS, romfs, YAFFS2, cramfs, EROFS
 - **Archives and images:** ZIP, tar, cpio, ISO 9660, Android sparse, Android boot
 - **Kernels and wrappers:** U-Boot uImage, U-Boot FIT, standalone gzip / xz / zstd / lz4 streams
-- **Firmware packages:** RAE Systems / Honeywell RFP (section table; LZARI-decompresses each section)
+- **Firmware packages:** RAE Systems / Honeywell RFP (section table; LZARI-decompresses each section); Artosyn OTRA (AR8030 / VT4 / VR04; SHA-256-verified, LZO1X-decompresses each partition, or exposes the raw flash body on flat images)
 
 ## Signatures
 

@@ -67,6 +67,7 @@ add_executable(moria
   src/extract/uboot_env.cpp
   src/extract/esp32_nvs.cpp
   src/esp32_nvs_parse.cpp
+  src/extract/otra.cpp
   src/extract/rae_rfp.cpp
   src/extract/lzari.cpp
   src/extract/vbf.cpp
@@ -112,6 +113,7 @@ add_executable(moria
   src/validators/jffs2.cpp
   src/validators/zip.cpp
   src/validators/jpeg.cpp
+  src/validators/otra.cpp
   src/validators/rae_rfp.cpp
   src/validators/vbf.cpp
   src/validators/verity.cpp
@@ -235,6 +237,7 @@ if(Python3_Interpreter_FOUND)
     test_luks
     test_lzma
     test_rae_rfp
+    test_otra
     test_vbf
     test_uboot_env
     test_vbmeta
