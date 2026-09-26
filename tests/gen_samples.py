@@ -684,6 +684,31 @@ def rae_rfp():
     return hdr + section(b"IniFile", 0, ini) + section(b"SIGN", 0, bytes(96))
 
 
+def otra():
+    # Artosyn OTRA firmware image: 0x220-byte header (magic 'OTRA', ver@4,
+    # compress@5, hashsize@0xa=0x20, siglen@0xe=0x100, body_size@0x10,
+    # region1@0x18, region2@0x1c, npart@0x20, nseg@0x22), a 32-byte SHA-256 of the
+    # body @0x100, a 256-byte RSA signature @0x120, then the body. This is the flat
+    # subtype (raw flash body, no usable tables); the correct body SHA-256 makes it
+    # verified. (test_otra.py covers the segmented + LZO-decompress path.)
+    import hashlib
+    b = bytearray(0x220)
+    b[0:4] = b"OTRA"
+    b[0x04] = 1                                   # version byte
+    b[0x05] = 0                                   # compress flag (flat: 0)
+    b[0x0a] = 0x20                                # hashsize
+    struct.pack_into("<H", b, 0x0e, 0x100)       # siglen
+    struct.pack_into("<I", b, 0x18, 0x40)        # region1_size
+    struct.pack_into("<H", b, 0x20, 1)           # npart
+    struct.pack_into("<H", b, 0x22, 1)           # nseg
+    b[0x80:0x85] = b"1.0.0"                       # build string
+    b += bytes(0x54)                             # one zeroed part + one zeroed seg entry
+    b += bytes((i * 13 + 7) & 0xFF for i in range(0x200))  # raw flash body
+    struct.pack_into("<I", b, 0x10, len(b) - 0x220)        # body_size
+    b[0x100:0x120] = hashlib.sha256(bytes(b[0x220:])).digest()
+    return bytes(b)
+
+
 def _crc16_ccitt(data):
     # CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF), the VBF per-block checksum.
     crc = 0xFFFF
@@ -1169,6 +1194,7 @@ MANIFEST = [
     ("fw.engenius", engenius, "engenius", STRUCTURAL),
     ("fw.lantronix", lantronix, "lantronix_firmware", STRUCTURAL),
     ("fw.rfp", rae_rfp, "rae_rfp", VERIFIED),
+    ("fw.otra", otra, "otra", VERIFIED),
     ("fw.vbf", vbf, "vbf", VERIFIED),
     ("android_magic_string.bin", android_magic_string, None, 0),
     ("android_magic_at_zero.bin", android_magic_at_zero, None, 0),
