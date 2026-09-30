@@ -37,6 +37,12 @@ python3 tests/test_luks.py
 python3 tests/test_lzma.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
 python3 tests/test_rae_rfp.py
+# Windows CE XIP ROM: ROMHDR resolution, module PE rebuild, CECompress decode.
+python3 tests/test_wince_rom.py
+# MS-CAB: stored/MSZIP/LZX folders + the CE installer _setup.xml install tree.
+python3 tests/test_cab.py
+# Windows CE registry hive: value-record recovery and its false-positive guard.
+python3 tests/test_wince_hive.py
 # VBF block extraction + LZSS decode round-trip (self-contained hard gate).
 python3 tests/test_vbf.py
 echo

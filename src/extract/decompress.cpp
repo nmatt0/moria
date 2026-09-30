@@ -475,6 +475,38 @@ std::optional<std::vector<uint8_t>> decompress_stream([[maybe_unused]] Compresso
     }
 }
 
+std::optional<std::vector<uint8_t>> mszip_block([[maybe_unused]] std::span<const uint8_t> src,
+                                                [[maybe_unused]] size_t out_len,
+                                                [[maybe_unused]] std::span<const uint8_t> history) {
+    if (out_len == 0) return std::nullopt;
+#ifdef MORIA_HAVE_ZLIB
+    std::vector<uint8_t> out(out_len);
+    z_stream s{};
+    if (inflateInit2(&s, -15) != Z_OK) return std::nullopt;
+    // For raw inflate the dictionary is set up front; MSZIP carries the tail of
+    // the previous block's output as the window a match may reach back into.
+    if (!history.empty() &&
+        inflateSetDictionary(&s, history.data(), static_cast<uInt>(history.size())) != Z_OK) {
+        inflateEnd(&s);
+        return std::nullopt;
+    }
+    s.next_in = const_cast<Bytef*>(src.data());
+    s.avail_in = static_cast<uInt>(src.size());
+    s.next_out = out.data();
+    s.avail_out = static_cast<uInt>(out_len);
+    const int rc = inflate(&s, Z_FINISH);
+    const size_t produced = out_len - s.avail_out;
+    inflateEnd(&s);
+    // Z_BUF_ERROR after a full block is normal: the deflate stream ends without
+    // a final block marker in some MSZIP encoders.
+    if (rc != Z_STREAM_END && rc != Z_OK && rc != Z_BUF_ERROR) return std::nullopt;
+    if (produced != out_len) return std::nullopt;
+    return out;
+#else
+    return std::nullopt;
+#endif
+}
+
 std::optional<std::vector<uint8_t>> decompress(Compressor c, std::span<const uint8_t> src,
                                                size_t max_out) {
     if (src.empty() || max_out == 0) return std::nullopt;

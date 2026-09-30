@@ -36,7 +36,7 @@ moria -j <file>           # JSON, for tools and agents
 moria -e <file>           # extract to <file>.extracted/   (-C DIR to choose the output dir)
 moria -c <file>           # carve raw byte ranges to <file>.carved/ (no parsing)
 moria -E <file>           # entropy pass: flag unidentified / possibly-encrypted regions
-moria --list <archive>    # list tar/cpio/zip members without extracting
+moria --list <archive>    # list tar/cpio/zip/cab/CE-ROM members without extracting
 moria --broad <path>      # also load the ~2.5k general file-type signatures
 moria --help
 ```
@@ -48,9 +48,10 @@ moria --help
 Unpacked in-process, no external tools and no sudo:
 
 - **Filesystems:** SquashFS, ext2/3/4, F2FS, FAT12/16/32, exFAT, NTFS, HFS+/HFSX, XFS, btrfs, JFFS2, UBI/UBIFS, romfs, YAFFS2, cramfs, EROFS
-- **Archives and images:** ZIP, tar, cpio, ISO 9660, Android sparse, Android boot
-- **Kernels and wrappers:** U-Boot uImage, U-Boot FIT, standalone gzip / xz / zstd / lz4 streams
+- **Archives and images:** ZIP, tar, cpio, MS-CAB (stored/MSZIP/LZX), ISO 9660, Android sparse, Android boot
+- **Kernels and wrappers:** U-Boot uImage, U-Boot FIT, Windows CE XIP ROM (nk.bin / .cos), standalone gzip / xz / zstd / lz4 streams
 - **Firmware packages:** RAE Systems / Honeywell RFP (section table; LZARI-decompresses each section)
+- **Configuration stores:** U-Boot environment, ESP32 NVS, Windows CE registry hives (`.hv`)
 
 ## Signatures
 

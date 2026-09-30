@@ -1,0 +1,37 @@
+# NOTE: all root-level keys must precede the first [[magic]] / [doc] table.
+name = "wince_rom"
+category = "container"
+
+# Windows CE XIP ROM image (nk.bin, and the Crestron .cos control-processor
+# images built from one). The image opens with the CPU's branch to the
+# bootstrap; at 0x40 sits the ROM signature "ECEC" followed by pTOC, the VIRTUAL
+# address of the ROMHDR, and the same value as an offset from the image start.
+# The ROMHDR carries the physical span plus the module and file table counts.
+# Nothing here is a length in the header itself, so the validator resolves pTOC
+# and derives the span from physfirst/physlast.
+magic_offset = 64
+
+struct = """
+  skip[64];
+  bytes[4] signature;
+  u32 ptoc;
+  u32 toc_offset;
+"""
+
+constraints = [
+  "ptoc != 0",
+]
+
+# Resolves pTOC -> ROMHDR, sizes the image, sets arch/compression. An image
+# whose pTOC does not resolve stays `magic` tier and is not extracted.
+validator = "wince_rom"
+
+[[magic]]
+ascii = "ECEC"
+endian = "little"
+
+[doc]
+description = "Windows CE XIP ROM image (ROMHDR + TOC): kernel modules stored as split E32/O32 PE images plus ROM files, both optionally CECompress-compressed."
+references = [
+  { title = "Windows CE ROMHDR / TOCentry (romimage)", url = "https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms924510(v=msdn.10)" },
+]

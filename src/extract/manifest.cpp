@@ -7,6 +7,7 @@
 #include "extract/android_sparse.hpp"
 #include "extract/compressed.hpp"
 #include "extract/descramble.hpp"
+#include "extract/cab.hpp"
 #include "extract/cpio.hpp"
 #include "extract/cramfs.hpp"
 #include "extract/erofs.hpp"
@@ -36,6 +37,8 @@
 #include "extract/upx.hpp"
 #include "extract/vbf.hpp"
 #include "extract/vbmeta.hpp"
+#include "extract/wince_hive.hpp"
+#include "extract/wince_rom.hpp"
 #include "extract/fit.hpp"
 
 namespace ft {
@@ -43,6 +46,7 @@ namespace ft {
 Extractor find_extractor(const std::string& type) {
     if (is_scheme(type)) return extract_descramble;  // vendor-encrypted -> descramble + recurse
     if (type == "squashfs") return extract_squashfs;
+    if (type == "cab") return extract_cab;
     if (type == "cpio") return extract_cpio;
     if (type == "ext") return extract_ext;
     if (type == "jffs2") return extract_jffs2;
@@ -64,6 +68,8 @@ Extractor find_extractor(const std::string& type) {
     if (type == "uboot_env") return extract_uboot_env;
     if (type == "esp32_nvs") return extract_esp32_nvs;
     if (type == "rae_rfp") return extract_rae_rfp;
+    if (type == "wince_rom") return extract_wince_rom;
+    if (type == "wince_hive") return extract_wince_hive;
     if (type == "vbf") return extract_vbf;
     if (type == "vbmeta") return extract_vbmeta;
     if (type == "upx") return extract_upx;
