@@ -2,6 +2,7 @@
 
 #include "validators/android_boot.hpp"
 #include "validators/cab.hpp"
+#include "validators/cfbf.hpp"
 #include "validators/cpio.hpp"
 #include "validators/deobf.hpp"
 #include "validators/dtb.hpp"
@@ -42,6 +43,7 @@ Validator find_validator(const std::string& name) {
     if (name == "uimage") return validate_uimage;
     if (name == "elf") return validate_elf;
     if (name == "cab") return validate_cab;
+    if (name == "cfbf") return validate_cfbf;
     if (name == "cpio") return validate_cpio;
     if (name == "dtb") return validate_dtb;
     if (name == "ihex") return validate_ihex;

@@ -767,6 +767,17 @@ def cab():
     return out + file_tab + data
 
 
+def cfbf():
+    # Compound file (CFBF), which is what an MSI is: a 512-byte header, a FAT, a
+    # directory, and streams chained through the FAT rather than stored
+    # contiguously. One MSI-encoded stream name so the decode path is covered.
+    import cfbfbuild
+    return cfbfbuild.build([
+        (cfbfbuild.msi_mangle("Data1.cab"), b"MSCF" + bytes(28) + b"payload" * 900),
+        ("_SummaryInformation", b"moria synthetic installer\n" * 8),
+    ])
+
+
 def _crc16_ccitt(data):
     # CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF), the VBF per-block checksum.
     crc = 0xFFFF
@@ -1254,6 +1265,7 @@ MANIFEST = [
     ("fw.rfp", rae_rfp, "rae_rfp", VERIFIED),
     ("nk.cos", wince_rom, "wince_rom", VERIFIED),
     ("install.cab", cab, "cab", VERIFIED),
+    ("installer.msi", cfbf, "cfbf", VERIFIED),
     ("default.hv", wince_hive, "wince_hive", CONSISTENT),
     ("fw.vbf", vbf, "vbf", VERIFIED),
     ("android_magic_string.bin", android_magic_string, None, 0),

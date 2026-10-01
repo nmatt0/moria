@@ -8,6 +8,7 @@
 #include "extract/compressed.hpp"
 #include "extract/descramble.hpp"
 #include "extract/cab.hpp"
+#include "extract/cfbf.hpp"
 #include "extract/cpio.hpp"
 #include "extract/cramfs.hpp"
 #include "extract/erofs.hpp"
@@ -47,6 +48,7 @@ Extractor find_extractor(const std::string& type) {
     if (is_scheme(type)) return extract_descramble;  // vendor-encrypted -> descramble + recurse
     if (type == "squashfs") return extract_squashfs;
     if (type == "cab") return extract_cab;
+    if (type == "cfbf") return extract_cfbf;
     if (type == "cpio") return extract_cpio;
     if (type == "ext") return extract_ext;
     if (type == "jffs2") return extract_jffs2;
@@ -148,6 +150,9 @@ std::string manifest_to_json(const Manifest& m) {
         esc(o, m.cap_reason);
         o += "\"";
     }
+
+    if (m.skipped_nested_executables)
+        o += ",\"skipped_nested_executables\":" + std::to_string(m.skipped_nested_executables);
     o += "}";
     return o;
 }

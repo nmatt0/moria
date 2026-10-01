@@ -102,6 +102,15 @@ public:
         left_ = 0;
     }
 
+    // Discard the bits left in the current 16-bit word. CAB pads the bitstream
+    // to a word boundary at the end of every 32 KiB output frame, so the next
+    // frame starts on one; without this the reader stays half a word ahead for
+    // the rest of the stream.
+    void align_word() {
+        if (left_ > 0) ensure(16);
+        if (left_ & 15) remove(static_cast<unsigned>(left_ & 15));
+    }
+
     size_t pos() const { return pos_; }
     void set_pos(size_t p) { pos_ = p; }
     size_t size() const { return in_.size(); }
@@ -250,6 +259,10 @@ public:
 
     bool intel_started() const { return intel_started_; }
     int32_t intel_filesize() const { return intel_filesize_; }
+
+    // Consume the pad bits that end a CAB output frame. Not used by the CE ROM
+    // framing, whose blocks are each a self-contained stream.
+    void align_frame() { bits_.align_word(); }
 
     std::vector<uint8_t> out;
 
@@ -589,18 +602,32 @@ std::optional<std::vector<uint8_t>> lzx_decompress_cab(std::span<const uint8_t> 
     LzxDecoder d(src, window_bits, out_len + kMaxMatch);
     if (!d.read_header()) return std::nullopt;
 
-    // Output is produced in 32 KiB frames; the x86 translation is per frame,
-    // using the frame's absolute position, and stops after 32768 frames.
-    size_t done = 0;
-    for (size_t frame = 0; done < out_len; ++frame) {
+    // Output is produced in 32 KiB frames. Two rules apply at every frame
+    // boundary: the bitstream is padded to the next 16-bit word, and the x86
+    // translation runs over that frame's bytes using their absolute position
+    // (for the first 32768 frames only).
+    //
+    // The translation writes to a copy, never to the decoder's buffer: that
+    // buffer doubles as the match window, and later matches must see the
+    // untranslated bytes.
+    std::vector<uint8_t> out;
+    out.reserve(out_len);
+    for (size_t frame = 0; out.size() < out_len; ++frame) {
+        const size_t done = out.size();
         const size_t want = std::min(kCabFrameSize, out_len - done);
         if (!d.decode_until(done + want)) return std::nullopt;
+        out.insert(out.end(), d.out.begin() + static_cast<ptrdiff_t>(done),
+                   d.out.begin() + static_cast<ptrdiff_t>(done + want));
         if (d.intel_started() && d.intel_filesize() != 0 && frame < 32768)
-            undo_e8(d.out, done, want, done, d.intel_filesize());
-        done += want;
+            undo_e8(out, done, want, done, d.intel_filesize());
+        if (out.size() < out_len) {
+            // A match that ran past the boundary would leave the pad bits at an
+            // unpredictable position; a conformant stream never emits one.
+            if (d.out.size() != done + want) return std::nullopt;
+            d.align_frame();
+        }
     }
-    d.out.resize(out_len);
-    return std::move(d.out);
+    return out;
 }
 
 }  // namespace ft

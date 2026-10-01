@@ -70,7 +70,7 @@ def build_rom():
     f2_name = add(b"packed.bin\0", 1)
 
     text_off = add(TEXT)
-    data_packed = ce_compress_blob(DATA)
+    data_packed = ce_compress_blob(DATA, compress=True)   # Huffman-coded LZX
     data_off = add(data_packed)
     f1_off = add(PLAIN)
     packed = ce_compress_blob(PACKED)

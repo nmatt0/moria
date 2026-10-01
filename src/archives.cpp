@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "cab_parse.hpp"
+#include "cfbf_parse.hpp"
 #include "wince_rom_parse.hpp"
 
 namespace ft {
@@ -140,6 +141,19 @@ void list_cab(const Reader& r, Finding& f) {
     }
 }
 
+// A compound file's directory already names every stream and its length, so
+// listing costs only the header + FAT walk. Storages are skipped: they are
+// directories, and only streams carry bytes.
+void list_cfbf(const Reader& r, Finding& f) {
+    Cfbf c;
+    if (!cfbf_parse(r, f.offset, c)) return;
+    for (const CfbfEntry& e : c.entries) {
+        if (e.type != kCfbfStream || e.size == 0) continue;
+        if (f.members.size() >= MAX_MEMBERS) { f.members_truncated = true; break; }
+        f.members.push_back({e.name, static_cast<uint64_t>(e.size), "stored", {}});
+    }
+}
+
 // A CE ROM carries two member lists: XIP modules and plain ROM files. Both are
 // named in the TOC, so listing is free.
 void list_wince_rom(const Reader& r, Finding& f) {
@@ -167,6 +181,7 @@ void list_members(const Reader& r, Finding& f) {
     else if (f.type == "cpio") list_cpio(r, f);
     else if (f.type == "zip") list_zip(r, f);
     else if (f.type == "cab") list_cab(r, f);
+    else if (f.type == "cfbf") list_cfbf(r, f);
     else if (f.type == "wince_rom") list_wince_rom(r, f);
 }
 

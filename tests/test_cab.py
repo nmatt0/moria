@@ -16,6 +16,7 @@ Self-contained; no external tools. Exit nonzero on any failure.
 """
 import json
 import os
+import random
 import struct
 import subprocess
 import sys
@@ -26,7 +27,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 MORIA = os.path.join(HERE, "..", "build", "moria")
 
-from lzxbuild import lzx_stored_stream  # noqa: E402
+from lzxbuild import lzx_compress, lzx_stored_stream  # noqa: E402
 
 COMP_NONE, COMP_MSZIP, COMP_LZX = 0, 1, 3
 FRAME = 32768
@@ -110,6 +111,39 @@ def lzx_blocks(data, nsplit=4):
         parts[-2] += parts[-1]
         parts.pop()
     return list(zip(parts, frames))
+
+
+def lzx_real_payload(n=110000):
+    """Bytes that exercise the whole compressed-LZX path.
+
+    Mixes long back-references (matches, including ones reaching across a
+    32 KiB frame boundary), incompressible runs (literals, so the main tree is
+    genuinely Huffman-coded) and x86 CALL sites (so the E8 filter runs).
+    """
+    rnd = random.Random(1234)
+    buf = bytearray()
+    motif = bytes(rnd.randrange(256) for _ in range(900))
+    while len(buf) < n:
+        r = rnd.random()
+        if r < 0.32:
+            buf += motif[:rnd.randrange(40, 900)]
+        elif r < 0.55:
+            buf += b"\xe8" + struct.pack("<i", rnd.randrange(-40000, 40000))
+        elif r < 0.75 and len(buf) > 40000:
+            src = len(buf) - rnd.randrange(1, min(len(buf), 60000))
+            buf += bytes(buf[src:src + rnd.randrange(8, 200)]) or b"\0"
+        else:
+            buf += bytes(rnd.randrange(256) for _ in range(rnd.randrange(1, 30)))
+    return bytes(buf[:n])
+
+
+def lzx_compressed_blocks(data, window_bits=21):
+    """A real compressed LZX folder: one CFDATA block per 32 KiB output frame."""
+    frames = lzx_compress(data, window_bits=window_bits, intel_filesize=len(data),
+                          block_ends=[50000, 88000, len(data)], aligned_blocks=(1,))
+    ulens = [len(data[i:i + FRAME]) for i in range(0, len(data), FRAME)]
+    assert len(frames) == len(ulens), (len(frames), len(ulens))
+    return list(zip(frames, ulens))
 
 
 SETUP_XML = """<wap-provisioningdoc>
@@ -232,7 +266,20 @@ def main():
         if rc:
             return rc
 
-        # 4. A Windows CE installer cabinet, rebuilt from its _setup.xml.
+        # 4. A real *compressed* LZX folder: Huffman-coded verbatim and aligned
+        #    blocks, matches, and the x86 filter, spanning four 32 KiB frames
+        #    with block boundaries deliberately off the frame boundaries. This
+        #    is the path every real-world LZX cabinet takes.
+        real = lzx_real_payload()
+        rc = check_roundtrip(
+            tmp, "lzx-real.cab",
+            folders=[(COMP_LZX | (21 << 8), lzx_compressed_blocks(real))],
+            files=[("real.bin", 0, 0, len(real))],
+            payloads={"real.bin": real}, want_comp="lzx")
+        if rc:
+            return rc
+
+        # 5. A Windows CE installer cabinet, rebuilt from its _setup.xml.
         members = [("_setup.xml", SETUP_XML), ("AGENT~1.001", AGENT),
                    ("HOSTKE~1.002", HOSTKEY), ("SETUP.999", SETUP_DLL),
                    ("HEADER.000", INSTALL_HDR), ("EXTRA~1.500", b"unlisted member")]
@@ -269,7 +316,8 @@ def main():
             if line not in reg:
                 return fail("CE cab: registry.reg missing %r:\n%s" % (line, reg))
 
-    print("ok: cab identify + stored/MSZIP/LZX extraction + CE install-tree rebuild")
+    print("ok: cab identify + stored/MSZIP/LZX (stored and compressed) extraction"
+          " + CE install-tree rebuild")
     return 0
 
 

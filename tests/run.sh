@@ -43,6 +43,8 @@ python3 tests/test_wince_rom.py
 python3 tests/test_cab.py
 # Windows CE registry hive: value-record recovery and its false-positive guard.
 python3 tests/test_wince_hive.py
+# CFBF/MSI compound files: FAT-chained (non-contiguous) stream reassembly.
+python3 tests/test_cfbf.py
 # VBF block extraction + LZSS decode round-trip (self-contained hard gate).
 python3 tests/test_vbf.py
 echo

@@ -70,10 +70,12 @@ add_executable(moria
   src/extract/rae_rfp.cpp
   src/extract/wince_rom.cpp
   src/extract/cab.cpp
+  src/extract/cfbf.cpp
   src/extract/wince_hive.cpp
   src/wince_hive_parse.cpp
   src/extract/ce_setup.cpp
   src/cab_parse.cpp
+  src/cfbf_parse.cpp
   src/extract/lzx.cpp
   src/wince_rom_parse.cpp
   src/extract/lzari.cpp
@@ -123,6 +125,7 @@ add_executable(moria
   src/validators/rae_rfp.cpp
   src/validators/wince_rom.cpp
   src/validators/cab.cpp
+  src/validators/cfbf.cpp
   src/validators/wince_hive.cpp
   src/validators/vbf.cpp
   src/validators/verity.cpp
@@ -249,6 +252,7 @@ if(Python3_Interpreter_FOUND)
     test_wince_rom
     test_wince_hive
     test_cab
+    test_cfbf
     test_vbf
     test_uboot_env
     test_vbmeta
