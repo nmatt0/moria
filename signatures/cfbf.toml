@@ -1,0 +1,54 @@
+# NOTE: all root-level keys must precede the first [[magic]] / [doc] table.
+name = "cfbf"
+category = "container"
+
+# Compound File Binary Format (MSI, .doc/.xls, .msg): a miniature FAT
+# filesystem. The
+# header names the sector geometry and where the FAT, mini-FAT and directory
+# start; the validator builds the FAT and walks the directory before believing
+# the match, and sizes the finding by the last sector the FAT accounts for
+# (nothing in the header records the file length).
+struct = """
+  bytes[8]  signature;
+  bytes[16] clsid;
+  u16 version_minor;
+  u16 version_major;
+  u16 byte_order;
+  u16 sector_shift;
+  u16 mini_sector_shift;
+  u16 reserved1;
+  u32 reserved2;
+  u32 num_dir_sectors;
+  u32 num_fat_sectors;
+  u32 first_dir_sector;
+  u32 txn_signature;
+  u32 mini_cutoff;
+  u32 first_minifat_sector;
+  u32 num_minifat_sectors;
+  u32 first_difat_sector;
+  u32 num_difat_sectors;
+"""
+
+constraints = [
+  "byte_order == 0xfffe",
+  "version_major >= 3 && version_major <= 4",
+  "sector_shift >= 9 && sector_shift <= 12",
+  "mini_sector_shift == 6",
+  "mini_cutoff == 4096",
+  "num_fat_sectors > 0",
+  "reserved1 == 0",
+  "reserved2 == 0",
+]
+
+# Builds the FAT, walks the directory, sizes the span, names MSI.
+validator = "cfbf"
+
+[[magic]]
+hex = "d0cf11e0a1b11ae1"
+endian = "little"
+
+[doc]
+description = "Compound File Binary Format (CFBF), the container behind Windows Installer .msi packages and legacy Office documents; the same on-disk layout was previously called OLE2 / OLE structured storage. Storages and streams are addressed through a FAT, so a stream's bytes are not contiguous in the file. Only the container is parsed, not the COM object semantics layered on it."
+references = [
+  { title = "[MS-CFB] Compound File Binary File Format", url = "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cfb/" },
+]

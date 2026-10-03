@@ -1,0 +1,33 @@
+# NOTE: all root-level keys must precede the first [[magic]] / [doc] table.
+name = "wince_hive"
+category = "container"
+
+# Windows CE registry hive (boot.hv / default.hv / user.hv). The file opens with
+# the hive block size, a zero DWORD, and the "EKIM" signature at offset 8, then
+# a header of GUIDs and hashes before the cell data. CE's cell layout is not NT's
+# regf, so the key tree is not walked; the validator instead proves the file is a
+# hive by recovering value records from the cell data, and the extractor writes
+# what it recovered.
+magic_offset = 8
+
+struct = """
+  u32 block_size;
+  u32 reserved;
+  bytes[4] signature;
+"""
+
+constraints = [
+  "reserved == 0",
+  "block_size >= 256",
+  "block_size <= 65536",
+  "block_size & (block_size - 1) == 0",
+]
+
+validator = "wince_hive"
+
+[[magic]]
+ascii = "EKIM"
+endian = "little"
+
+[doc]
+description = "Windows CE registry hive (EKIM). Holds the device's registry — service configuration, credentials, and certificates. Value records are recovered structurally; CE's cell layout means the key tree they belonged to is not reconstructed."

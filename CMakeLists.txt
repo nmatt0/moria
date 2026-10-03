@@ -68,6 +68,16 @@ add_executable(moria
   src/extract/esp32_nvs.cpp
   src/esp32_nvs_parse.cpp
   src/extract/rae_rfp.cpp
+  src/extract/wince_rom.cpp
+  src/extract/cab.cpp
+  src/extract/cfbf.cpp
+  src/extract/wince_hive.cpp
+  src/wince_hive_parse.cpp
+  src/extract/ce_setup.cpp
+  src/cab_parse.cpp
+  src/cfbf_parse.cpp
+  src/extract/lzx.cpp
+  src/wince_rom_parse.cpp
   src/extract/lzari.cpp
   src/extract/vbf.cpp
   src/extract/vbmeta.cpp
@@ -113,6 +123,10 @@ add_executable(moria
   src/validators/zip.cpp
   src/validators/jpeg.cpp
   src/validators/rae_rfp.cpp
+  src/validators/wince_rom.cpp
+  src/validators/cab.cpp
+  src/validators/cfbf.cpp
+  src/validators/wince_hive.cpp
   src/validators/vbf.cpp
   src/validators/verity.cpp
   src/validators/vbmeta.cpp
@@ -235,6 +249,10 @@ if(Python3_Interpreter_FOUND)
     test_luks
     test_lzma
     test_rae_rfp
+    test_wince_rom
+    test_wince_hive
+    test_cab
+    test_cfbf
     test_vbf
     test_uboot_env
     test_vbmeta

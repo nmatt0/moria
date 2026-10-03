@@ -684,6 +684,100 @@ def rae_rfp():
     return hdr + section(b"IniFile", 0, ini) + section(b"SIGN", 0, bytes(96))
 
 
+def wince_rom():
+    # Windows CE XIP ROM: an ARM branch, "ECEC" + pTOC + the TOC offset at 0x40,
+    # then a ROMHDR whose physfirst is the image's virtual base, followed by the
+    # module and file tables. One module (headers only, no sections) and one
+    # stored file is enough for the validator to resolve pTOC -> ROMHDR.
+    base = 0x80200000
+    img = bytearray(0x40)
+    struct.pack_into("<I", img, 0, 0xEA0003FE)          # b bootstrap
+    img += b"ECEC" + struct.pack("<II", 0, 0)           # pTOC / TOC offset, patched below
+
+    def add(blob, align=4):
+        while len(img) % align:
+            img.append(0)
+        off = len(img)
+        img.extend(blob)
+        return off
+
+    mod_name = add(b"nk.exe\0", 1)
+    file_name = add(b"boot.hv\0", 1)
+    payload = add(b"; minimal CE ROM file\r\n")
+    payload_len = 23
+    o32 = add(struct.pack("<6I", 0x1000, 0x1000, 0, 0, base + 0x1000, 0x60000020))
+    e32 = add(struct.pack("<HHII", 1, 0x210E, 0x1000, base) + struct.pack("<HH", 4, 0) +
+              struct.pack("<II", 0x10000, 0x2000) + struct.pack("<II", 0, 0) +
+              struct.pack("<I", 0) + struct.pack("<12I", *([0] * 12)))
+
+    while len(img) % 4:
+        img.append(0)
+    hdr = len(img)
+    img += struct.pack("<15I", base, 0, 1, base + 0x400000, base + 0x410000, base + 0x800000,
+                       0, 0, 0, 0, 1, 0, 0x19191919, 0, 0)
+    img += struct.pack("<HH", 0x01C2, 0) + struct.pack("<3I", 0, 0, 0)
+    img += struct.pack("<8I", 0x20, 0, 0, 0x1000, base + mod_name, base + e32, base + o32, base)
+    img += struct.pack("<7I", 0x20, 0, 0, payload_len, payload_len, base + file_name,
+                       base + payload)
+
+    struct.pack_into("<I", img, 0x44, base + hdr)
+    struct.pack_into("<I", img, 0x48, hdr)
+    struct.pack_into("<I", img, hdr + 4, base + len(img))   # physlast == EOF
+    return bytes(img)
+
+
+def wince_hive():
+    # Windows CE registry hive: block size, a zero DWORD, "EKIM" at offset 8,
+    # a header of GUIDs/hashes, then value records
+    # [u16 type; u16 data_len; u16 name_len; utf16 name; data]. The validator
+    # requires real records, so plant a handful.
+    hv = bytearray(struct.pack("<II", 0x400, 0) + b"EKIM" + bytes(range(0x34)))
+    vals = [("Version", 1, "1.0\0".encode("utf-16-le")),
+            ("Path", 2, "%CE2%\\svc.exe\0".encode("utf-16-le")),
+            ("Flags", 4, struct.pack("<I", 1)),
+            ("Serial", 11, struct.pack("<Q", 2)),
+            ("Hash", 3, bytes(16)),
+            ("Order", 7, "a\0b\0\0".encode("utf-16-le")),
+            ("Dll", 1, "svc.dll\0".encode("utf-16-le")),
+            ("Index", 4, struct.pack("<I", 7)),
+            ("Port", 4, struct.pack("<I", 41794))]
+    for name, t, data in vals:
+        n = name.encode("utf-16-le")
+        hv += struct.pack("<HHH", t, len(data), len(n) // 2) + n + data + bytes(4)
+    while len(hv) % 0x400:
+        hv.append(0)
+    return bytes(hv)
+
+
+def cab():
+    # Microsoft Cabinet: CFHEADER (three zero reserved DWORDs, total size, the
+    # file-table offset, version 1.3), one stored CFFOLDER, one CFFILE, one
+    # CFDATA block holding the member verbatim.
+    payload = b"cabinet member\r\n" * 4
+    name = b"readme.txt\0"
+    hdr_len = 0x24
+    coff_files = hdr_len + 8
+    file_tab = struct.pack("<IIHHHH", len(payload), 0, 0, 0x2A21, 0x5B20, 0x20) + name
+    data_off = coff_files + len(file_tab)
+    data = struct.pack("<IHH", 0, len(payload), len(payload)) + payload
+    total = data_off + len(data)
+    out = struct.pack("<4sIIIIIBBHHHHH", b"MSCF", 0, total, 0, coff_files, 0, 3, 1,
+                      1, 1, 0, 0x1234, 0)
+    out += struct.pack("<IHH", data_off, 1, 0)
+    return out + file_tab + data
+
+
+def cfbf():
+    # Compound file (CFBF), which is what an MSI is: a 512-byte header, a FAT, a
+    # directory, and streams chained through the FAT rather than stored
+    # contiguously. One MSI-encoded stream name so the decode path is covered.
+    import cfbfbuild
+    return cfbfbuild.build([
+        (cfbfbuild.msi_mangle("Data1.cab"), b"MSCF" + bytes(28) + b"payload" * 900),
+        ("_SummaryInformation", b"moria synthetic installer\n" * 8),
+    ])
+
+
 def _crc16_ccitt(data):
     # CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF), the VBF per-block checksum.
     crc = 0xFFFF
@@ -1169,6 +1263,10 @@ MANIFEST = [
     ("fw.engenius", engenius, "engenius", STRUCTURAL),
     ("fw.lantronix", lantronix, "lantronix_firmware", STRUCTURAL),
     ("fw.rfp", rae_rfp, "rae_rfp", VERIFIED),
+    ("nk.cos", wince_rom, "wince_rom", VERIFIED),
+    ("install.cab", cab, "cab", VERIFIED),
+    ("installer.msi", cfbf, "cfbf", VERIFIED),
+    ("default.hv", wince_hive, "wince_hive", CONSISTENT),
     ("fw.vbf", vbf, "vbf", VERIFIED),
     ("android_magic_string.bin", android_magic_string, None, 0),
     ("android_magic_at_zero.bin", android_magic_at_zero, None, 0),

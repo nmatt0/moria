@@ -4,6 +4,10 @@
 #include <string>
 #include <vector>
 
+#include "cab_parse.hpp"
+#include "cfbf_parse.hpp"
+#include "wince_rom_parse.hpp"
+
 namespace ft {
 
 namespace {
@@ -121,12 +125,64 @@ void list_zip(const Reader& r, Finding& f) {
     }
 }
 
+// A cabinet's members are slices of a folder's decompressed stream; listing
+// needs only the two tables, never the streams.
+void list_cab(const Reader& r, Finding& f) {
+    CabHeader h;
+    std::vector<CabFolder> folders;
+    std::vector<CabFile> files;
+    if (!cab_header(r, f.offset, h) || !cab_folders(r, f.offset, h, folders) ||
+        !cab_files(r, f.offset, h, files))
+        return;
+    for (const CabFile& cf : files) {
+        if (f.members.size() >= MAX_MEMBERS) { f.members_truncated = true; break; }
+        const size_t fi = cf.ifolder < folders.size() ? cf.ifolder : 0;
+        f.members.push_back({cf.name, cf.size, cab_comp_name(folders[fi].comp()), {}});
+    }
+}
+
+// A compound file's directory already names every stream and its length, so
+// listing costs only the header + FAT walk. Storages are skipped: they are
+// directories, and only streams carry bytes.
+void list_cfbf(const Reader& r, Finding& f) {
+    Cfbf c;
+    if (!cfbf_parse(r, f.offset, c)) return;
+    for (const CfbfEntry& e : c.entries) {
+        if (e.type != kCfbfStream || e.size == 0) continue;
+        if (f.members.size() >= MAX_MEMBERS) { f.members_truncated = true; break; }
+        f.members.push_back({e.name, static_cast<uint64_t>(e.size), "stored", {}});
+    }
+}
+
+// A CE ROM carries two member lists: XIP modules and plain ROM files. Both are
+// named in the TOC, so listing is free.
+void list_wince_rom(const Reader& r, Finding& f) {
+    CeRomHeader h;
+    if (!ce_rom_header(r, f.offset, h)) return;
+    std::vector<CeModule> modules;
+    std::vector<CeFile> files;
+    ce_rom_modules(r, f.offset, h, modules);
+    ce_rom_files(r, f.offset, h, files);
+    for (const CeModule& m : modules) {
+        if (f.members.size() >= MAX_MEMBERS) { f.members_truncated = true; return; }
+        f.members.push_back({m.name, m.size, "module", {}});
+    }
+    for (const CeFile& cf : files) {
+        if (f.members.size() >= MAX_MEMBERS) { f.members_truncated = true; return; }
+        f.members.push_back(
+            {cf.name, cf.real, cf.comp != cf.real ? "file · cecompress" : "file", {}});
+    }
+}
+
 }  // namespace
 
 void list_members(const Reader& r, Finding& f) {
     if (f.type == "tar") list_tar(r, f);
     else if (f.type == "cpio") list_cpio(r, f);
     else if (f.type == "zip") list_zip(r, f);
+    else if (f.type == "cab") list_cab(r, f);
+    else if (f.type == "cfbf") list_cfbf(r, f);
+    else if (f.type == "wince_rom") list_wince_rom(r, f);
 }
 
 }  // namespace ft

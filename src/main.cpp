@@ -129,6 +129,9 @@ void print_help(std::FILE* out, const char* prog, bool color) {
                  "      --list          List archive contents without extracting\n"
                  "  -C, --outdir <DIR>  Output directory for -e / -c\n"
                  "      --depth <N>     Max extraction recursion depth (default: 8)\n"
+                 "      --unpack-executables\n"
+                 "                      Also unpack installer/document containers found\n"
+                 "                      inside other extracted output\n"
                  "      --max-files <N> Stop extraction after N files (default: 500000)\n"
                  "      --max-bytes <N> Stop extraction after N bytes (default: 4 GiB)\n"
                  "      --sigs <DIR>    Load signatures from DIR\n"
@@ -158,10 +161,38 @@ struct RecurCtx {
     size_t max_files;
     uint64_t max_bytes;
     bool all = false;  // -A/--all: don't suppress interior compressed streams
+    bool unpack_exe = false; // --unpack-executables: unpack nested installer/document containers
     // running totals
     size_t total_files = 0;
     uint64_t total_bytes = 0;
+    size_t skipped_nested_executables = 0;  // containers left packed by the default policy
 };
+
+// Formats that carry a whole application's worth of members and are rarely what
+// an analyst is after once they are nested inside something else. An MSI alone
+// unpacks to a few hundred database-table streams; two cabinets with an MSI
+// apiece bury the findings that matter. So these are unpacked only in the file
+// the user pointed at — where they ARE the subject — or on explicit opt-in.
+bool nested_opt_in(const std::string& type) { return type == "cfbf"; }
+
+// Does this produced file start like an executable? Used to decide whether
+// extraction may dig *inside* it.
+//
+// Only the leading magic is read -- no header is followed (an MZ is not chased
+// through e_lfanew to its PE signature). That is deliberate: this is a cheap
+// carrier test, not an identification. The scan already ran over this file, and
+// the cost of a false positive here is a container left unopened behind
+// --unpack-executables, not a wrong answer.
+bool has_executable_magic(const ft::Reader& r) {
+    auto b = r.bytes(0, 4);
+    if (!b) return false;
+    const uint8_t* p = b->data();
+    if (p[0] == 'M' && p[1] == 'Z') return true;                                  // PE / DOS
+    if (p[0] == 0x7F && p[1] == 'E' && p[2] == 'L' && p[3] == 'F') return true;   // ELF
+    const uint32_t m = uint32_t(p[0]) | (uint32_t(p[1]) << 8) | (uint32_t(p[2]) << 16) |
+                       (uint32_t(p[3]) << 24);
+    return m == 0xFEEDFACE || m == 0xFEEDFACF || m == 0xCEFAEDFE || m == 0xCFFAEDFE;  // Mach-O
+}
 
 constexpr uint64_t RATIO_FLOOR = 10u << 20;  // only ratio-check outputs above 10 MB
 constexpr uint64_t RATIO_LIMIT = 1000;       // output/input > this = likely bomb
@@ -244,6 +275,11 @@ void descend(const std::string& base_sub, size_t level, RecurCtx& c) {
             if (ft::find_extractor(f.type) && f.confidence >= static_cast<uint8_t>(ft::Confidence::Structural))
                 keep.push_back(f);
         if (keep.empty()) continue;
+        // Skip executables to avoid expansion unless requested
+        if (!c.unpack_exe && has_executable_magic(r)) {
+            c.skipped_nested_executables++;
+            continue;
+        }
         extract_findings(r, keep, rel + ".extracted", level, c);
     }
 }
@@ -286,6 +322,10 @@ void extract_findings(ft::Reader& reader, const std::vector<ft::Finding>& findin
         } else if (f.type == "exfat") {
             if (f.offset >= exfat_cov) continue;
             exfat_cov = f.offset;
+        }
+        if (level > 1 && !c.unpack_exe && nested_opt_in(f.type)) {
+            c.skipped_nested_executables++;
+            continue;
         }
         if (c.total_files >= c.max_files) { mark_capped(c, "max-files"); break; }
         if (c.total_bytes >= c.max_bytes) { mark_capped(c, "max-bytes"); break; }
@@ -357,7 +397,7 @@ std::string run_extraction(const std::string& src_path, ft::Reader& reader,
                            const std::vector<ft::Finding>& findings,
                            const std::vector<ft::Signature>& sigs, const std::string& outdir,
                            size_t max_depth, size_t max_files, uint64_t max_bytes, bool all,
-                           ft::Manifest& manifest) {
+                           bool unpack_exe, ft::Manifest& manifest) {
     manifest.source = src_path;
 
     ft::SafeRoot root;
@@ -365,8 +405,9 @@ std::string run_extraction(const std::string& src_path, ft::Reader& reader,
         std::fprintf(stderr, "error: cannot create output dir: %s\n", outdir.c_str());
         return "";
     }
-    RecurCtx c{root, sigs, manifest, max_depth, max_files, max_bytes, all};
+    RecurCtx c{root, sigs, manifest, max_depth, max_files, max_bytes, all, unpack_exe};
     extract_findings(reader, findings, "", 1, c);
+    manifest.skipped_nested_executables = c.skipped_nested_executables;
 
     if (manifest.entries.empty()) return "";
     std::string json = ft::manifest_to_json(manifest);
@@ -381,12 +422,13 @@ int main(int argc, char** argv) {
     const auto t_start = std::chrono::steady_clock::now();
     const char* prog = basename_of(argv[0]);
     std::string sig_dir_cli, path;
-    unsigned threads = 0;  // 0 -> auto
+    unsigned threads = 0;    // 0 -> auto
     bool broad = false;
-    bool json_out = false;  // default is the human-readable view
-    bool show_all = false;  // -A: don't collapse compressed-stream swarms
-    bool verbose = false;   // -v: show full labels (no ellipsis truncation)
-    bool entropy = false;   // -E: entropy analysis (unidentified regions + hints)
+    bool json_out = false;   // default is the human-readable view
+    bool show_all = false;   // -A: don't collapse compressed-stream swarms
+    bool unpack_exe = false; // --unpack-executables: unpack nested installer containers
+    bool verbose = false;    // -v: show full labels (no ellipsis truncation)
+    bool entropy = false;    // -E: entropy analysis (unidentified regions + hints)
     bool list = false;
     bool extract = false;
     bool carve = false;
@@ -424,6 +466,8 @@ int main(int argc, char** argv) {
             broad = true;
         } else if (!end_of_opts && (std::strcmp(a, "--json") == 0 || std::strcmp(a, "-j") == 0)) {
             json_out = true;
+        } else if (!end_of_opts && std::strcmp(a, "--unpack-executables") == 0) {
+            unpack_exe = true;
         } else if (!end_of_opts && (std::strcmp(a, "--all") == 0 || std::strcmp(a, "-A") == 0)) {
             show_all = true;
         } else if (!end_of_opts && (std::strcmp(a, "--verbose") == 0 || std::strcmp(a, "-v") == 0)) {
@@ -606,7 +650,7 @@ int main(int argc, char** argv) {
     if (extract) {
         outdir = outdir_cli.empty() ? path + ".extracted" : outdir_cli;
         extraction = run_extraction(path, reader, findings, sigs.signatures, outdir, rec_depth,
-                                    rec_max_files, rec_max_bytes, show_all, manifest);
+                                    rec_max_files, rec_max_bytes, show_all, unpack_exe, manifest);
     }
     // Carve (`-c`): dump each finding's raw byte range (and the unidentified gaps)
     // to disk without parsing, so a researcher gets the bytes even when extraction
@@ -638,6 +682,12 @@ int main(int argc, char** argv) {
         char buf[512];
         std::string footer;
         if (!extraction.empty()) footer += "-> extracted to " + outdir + "/\n";
+        if (manifest.skipped_nested_executables > 0)
+            footer += "-> " + std::to_string(manifest.skipped_nested_executables) +
+                      (manifest.skipped_nested_executables == 1
+                           ? " nested executable/installer container"
+                           : " nested executables/installer containers") +
+                      " identified but not unpacked (--unpack-executables)\n";
         if (carve && cr.regions_written > 0) {
             footer += "-> carved " + std::to_string(cr.regions_written) +
                       (cr.regions_written == 1 ? " region (" : " regions (") +

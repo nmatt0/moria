@@ -66,6 +66,15 @@ std::optional<std::vector<uint8_t>> upx_lzma_block_exact(std::span<const uint8_t
                                                          size_t out_len, uint8_t lc, uint8_t lp,
                                                          uint8_t pb);
 
+// Decompress one MS-CAB MSZIP block: a raw DEFLATE stream (the caller strips
+// the 2-byte "CK" marker) that may reference up to 32 KiB of the PREVIOUS
+// block's output as a preset dictionary. `history` is that output (empty for
+// the first block of a folder); `out_len` is the block's declared decoded size,
+// which MSZIP caps at 32768. Returns nullopt on a corrupt stream, a short
+// decode, or when zlib was not compiled in.
+std::optional<std::vector<uint8_t>> mszip_block(std::span<const uint8_t> src, size_t out_len,
+                                                std::span<const uint8_t> history);
+
 // Identify-time probe for a legacy standalone LZMA1 (".lzma alone") stream: the
 // FP-proof gate for a magicless format. Decodes `src` with the .lzma-alone
 // decoder, growing the output up to `out_cap` bytes, and succeeds ONLY if the
