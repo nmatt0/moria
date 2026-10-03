@@ -159,9 +159,50 @@ def main():
     rc = executable_carrier_policy()
     if rc:
         return rc
+    rc = deep_directory_chain()
+    if rc:
+        return rc
 
     print("ok: cfbf identify + MSI name decode + fragmented stream reassembly"
-          " + nesting policy")
+          " + nesting policy + deep-directory walk")
+    return 0
+
+
+def deep_directory_chain():
+    """A crafted directory must not overflow the stack during extraction.
+
+    The directory is a red-black tree of siblings plus storage children; nothing
+    forces it to be balanced, so a hostile compound file can lay its entries out
+    as one long linear chain. A recursive walk overflowed the call stack on this
+    (a ~120k-entry chain segfaults `moria -e`); the walk is now iterative, so any
+    depth up to the 262144-entry cap is safe. The deepest entry carries a payload
+    that must come back byte-for-byte, proving the walk reached the end rather
+    than bailing out early.
+
+    The chain length is sized to blow a default 8 MiB stack on the old recursive
+    code; `run()` raises on the resulting segfault, so this fails loudly if the
+    recursion ever comes back.
+    """
+    payload = b"deepest-entry-must-survive-" * 400
+    blob = cfbfbuild.build_deep_chain(120000, payload=payload)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "deep.msi")
+        with open(path, "wb") as f:
+            f.write(blob)
+        out = os.path.join(tmp, "out")
+        j = run(path, out)  # a stack-overflow segfault would raise here
+
+        finds = [x for x in j["findings"] if x["type"] == "cfbf"]
+        if len(finds) != 1:
+            return fail("deep-chain file not identified as a single cfbf (got %d)" % len(finds))
+
+        got = find_file(out, "deep")
+        if got is None:
+            return fail("the deepest entry in the chain was not walked/extracted")
+        if open(got, "rb").read() != payload:
+            return fail("deepest entry did not round-trip byte-for-byte")
+        print("  PASS  120k-deep directory chain extracted without stack overflow")
     return 0
 
 

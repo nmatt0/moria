@@ -1,6 +1,7 @@
 // cfbf.cpp — compound file (CFBF) extractor. See the header.
 #include "extract/cfbf.hpp"
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -30,23 +31,50 @@ std::string safe_name(const std::string& name) {
     return out;
 }
 
-// Walk the directory tree, recording each entry's path. Siblings form a
+// Walk the directory tree, recording each stream's path. Siblings form a
 // red-black tree inside their storage; a storage's `child` heads the tree of
 // what it holds. `seen` breaks the cycles a corrupt directory can describe.
-void walk_tree(const Cfbf& c, uint32_t idx, const std::string& prefix,
-               std::vector<std::string>& paths, std::vector<char>& seen) {
-    if (idx == kCfbfNoStream || idx >= c.entries.size() || seen[idx]) return;
-    seen[idx] = 1;
-    const CfbfEntry& e = c.entries[idx];
+//
+// The walk is iterative with an explicit work stack, not recursive: the entry
+// count is bounded only by kMaxDirEntries (262144), and a crafted directory can
+// lay those out as one long linear left/right sibling chain (or a deep storage
+// nesting). Recursing per node would overflow the call stack on such input; the
+// explicit stack lives on the heap and cannot.
+void walk_tree(const Cfbf& c, uint32_t root_idx, std::vector<std::string>& paths,
+               std::vector<char>& seen) {
+    struct Node {
+        uint32_t idx;
+        const std::string* prefix;
+    };
+    const std::string empty;
+    // A storage's path is the prefix its children carry, so it must outlive the
+    // child nodes still on the stack. These are heap-allocated and only ever
+    // appended, so a pointer into the pool stays valid as it grows.
+    std::vector<std::unique_ptr<std::string>> pool;
+    std::vector<Node> stack;
+    stack.push_back({root_idx, &empty});
 
-    walk_tree(c, e.left, prefix, paths, seen);
+    while (!stack.empty()) {
+        const Node n = stack.back();
+        stack.pop_back();
+        const uint32_t idx = n.idx;
+        if (idx == kCfbfNoStream || idx >= c.entries.size() || seen[idx]) continue;
+        seen[idx] = 1;
+        const CfbfEntry& e = c.entries[idx];
+        const std::string& prefix = *n.prefix;
 
-    const std::string name = safe_name(e.name);
-    const std::string full = prefix.empty() ? name : prefix + "/" + name;
-    if (e.type == kCfbfStream) paths[idx] = full;
-    if (e.type == kCfbfStorage) walk_tree(c, e.child, full, paths, seen);
+        const std::string name = safe_name(e.name);
+        std::string full = prefix.empty() ? name : prefix + "/" + name;
+        if (e.type == kCfbfStream) paths[idx] = full;
 
-    walk_tree(c, e.right, prefix, paths, seen);
+        // Siblings inherit this node's prefix; a storage's children get `full`.
+        stack.push_back({e.left, n.prefix});
+        stack.push_back({e.right, n.prefix});
+        if (e.type == kCfbfStorage) {
+            pool.push_back(std::make_unique<std::string>(std::move(full)));
+            stack.push_back({e.child, pool.back().get()});
+        }
+    }
 }
 
 }  // namespace
@@ -73,7 +101,7 @@ bool extract_cfbf(const Reader& r, const Finding& f, SafeRoot& root, const std::
     // dropped: a damaged directory should cost you the hierarchy, not the data.
     std::vector<std::string> paths(c.entries.size());
     std::vector<char> seen(c.entries.size(), 0);
-    walk_tree(c, c.entries[0].child, "", paths, seen);
+    walk_tree(c, c.entries[0].child, paths, seen);
 
     std::unordered_map<std::string, int> used;
     for (size_t i = 0; i < c.entries.size(); ++i) {

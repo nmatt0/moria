@@ -160,3 +160,81 @@ def build(streams, interleave=True):
     for i in range(109):
         struct.pack_into("<I", hdr, 0x4C + i * 4, i if i < nfat else FREE)
     return bytes(hdr) + bytes(body)
+
+
+def build_deep_chain(n, payload=b"deep-chain-payload-" * 300):
+    """A compound file whose directory is one linear chain of `n` stream entries
+    (each entry's `left` points at the next), to exercise the extractor's
+    directory walk against stack exhaustion. A crafted MSI can nest the sibling
+    tree up to the 262144-entry cap deep; a recursive walk overflows the call
+    stack on it. The deepest entry carries `payload` (>= the 4096 mini cutoff,
+    so it lives in a regular FAT chain) and must come back byte-for-byte, which
+    proves the walk actually reached the end of the chain rather than giving up.
+
+    Uses 4096-byte sectors so even a large `n` needs only a handful of FAT
+    sectors, which fit the 109 inline DIFAT slots (no DIFAT-sector chain).
+    """
+    ss = 1 << 12
+    assert len(payload) >= MINI_CUTOFF
+
+    def entry(name, typ, left, right, child, start, size):
+        b = bytearray(128)
+        u = name.encode("utf-16-le")[:62]
+        b[:len(u)] = u
+        struct.pack_into("<H", b, 0x40, len(u) + 2)   # name length incl NUL
+        b[0x42] = typ
+        struct.pack_into("<III", b, 0x44, left, right, child)
+        struct.pack_into("<I", b, 0x74, start)
+        struct.pack_into("<Q", b, 0x78, size)
+        return bytes(b)
+
+    dir_sectors = ((n + 1) * 128 + ss - 1) // ss
+    pay_sectors = (len(payload) + ss - 1) // ss
+    pay_start = dir_sectors                       # payload sits right after the directory
+
+    # Root -> entry 1; entry i -> entry i+1 via `left`; the last carries payload.
+    entries = [entry("Root Entry", 5, NOSTREAM, NOSTREAM, 1, ENDOFCHAIN, 0)]
+    for i in range(1, n + 1):
+        nxt = i + 1 if i < n else NOSTREAM
+        if i == n:
+            entries.append(entry("deep", 2, nxt, NOSTREAM, NOSTREAM, pay_start, len(payload)))
+        else:
+            entries.append(entry("s%d" % i, 2, nxt, NOSTREAM, NOSTREAM, ENDOFCHAIN, 0))
+    dir_bytes = b"".join(entries).ljust(dir_sectors * ss, b"\0")
+
+    # FAT: dir chain, payload chain, then the FAT sectors themselves (FATSECT).
+    nfat = 1
+    while True:
+        total = dir_sectors + pay_sectors + nfat
+        need = (total * 4 + ss - 1) // ss
+        if need == nfat:
+            break
+        nfat = need
+    fat_base = dir_sectors + pay_sectors
+    fat = [FREE] * (fat_base + nfat)
+    for i in range(dir_sectors):
+        fat[i] = i + 1 if i + 1 < dir_sectors else ENDOFCHAIN
+    for i in range(pay_sectors):
+        fat[pay_start + i] = pay_start + i + 1 if i + 1 < pay_sectors else ENDOFCHAIN
+    for i in range(nfat):
+        fat[fat_base + i] = FATSECT
+    fat_bytes = struct.pack("<%dI" % len(fat), *fat).ljust(nfat * ss, b"\xff")
+
+    body = bytearray((fat_base + nfat) * ss)
+    body[0:len(dir_bytes)] = dir_bytes
+    body[pay_start * ss:pay_start * ss + len(payload)] = payload
+    body[fat_base * ss:fat_base * ss + len(fat_bytes)] = fat_bytes
+
+    hdr = bytearray(ss)
+    hdr[0:8] = bytes([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1])
+    struct.pack_into("<HHHHH", hdr, 0x18, 0x003E, 4, 0xFFFE, 12, 6)  # major 4, 4096-byte sectors
+    struct.pack_into("<I", hdr, 0x2C, nfat)
+    struct.pack_into("<I", hdr, 0x30, 0)              # first dir sector
+    struct.pack_into("<I", hdr, 0x38, MINI_CUTOFF)
+    struct.pack_into("<I", hdr, 0x3C, ENDOFCHAIN)     # first minifat
+    struct.pack_into("<I", hdr, 0x40, 0)
+    struct.pack_into("<I", hdr, 0x44, ENDOFCHAIN)     # first difat
+    struct.pack_into("<I", hdr, 0x48, 0)
+    for i in range(109):
+        struct.pack_into("<I", hdr, 0x4C + i * 4, fat_base + i if i < nfat else FREE)
+    return bytes(hdr) + bytes(body)

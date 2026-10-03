@@ -215,7 +215,7 @@ bool extract_cab(const Reader& r, const Finding& f, SafeRoot& root, const std::s
         }
     }
 
-    size_t failures = 0, mapped = 0, unmapped = 0;
+    size_t failures = 0, unmapped = 0;
     bool made_fs = false, made_unmapped = false;
 
     for (size_t fi = 0; fi < folders.size(); ++fi) {
@@ -253,7 +253,6 @@ bool extract_cab(const Reader& r, const Finding& f, SafeRoot& root, const std::s
                         out.dirs++;
                     }
                     rel = subdir + "/fs/" + it->second;
-                    ++mapped;
                 } else if (ends_with(lname, ".999")) {
                     // cabwiz stores the setup DLL (Install_Init / Install_Exit)
                     // as the .999 member and the install header as .000.
