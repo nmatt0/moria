@@ -1,0 +1,62 @@
+name = "otra"
+category = "firmware"
+
+# Artosyn "OTRA" firmware upgrade image (AR8030 / VT4 / VR04 goggles + air units,
+# HGLRC / BetaFPV / arlink). 256-byte header, then a 32-byte SHA-256 of the body
+# and a 256-byte RSA-2048 signature, then the body (bytes 0x220..EOF):
+#
+#   0x000  256 B  header  (magic 'OTRA', ver@4, compress@5, hashsize@0xa=0x20,
+#                          siglen@0xe=0x100, body_size@0x10 = filesize-0x220,
+#                          region1_size@0x18, region2_size@0x1c,
+#                          npart@0x20 u16, nseg@0x22 u16)
+#   0x100   32 B  SHA-256 of the body
+#   0x120  256 B  RSA-2048 signature
+#   0x220  ...    body
+#
+# Two body layouts occur in the wild and the validator tells them apart:
+#   * segmented (VR04 goggles, 14 parts / 10 segs): a partition table (npart x
+#     0x34: name[0x20], u64 flash_off, u64 capacity, u32 flags) then a segment
+#     table (nseg x 0x20: u64 file_off, u64 flash_off, u64 data_len, u64 flash_len),
+#     then LZO1X-compressed payloads. Each partition is the concat of its segments.
+#   * flat (arlink VT4 radio, small ~1 MB images): the body is a raw dual-slot
+#     flash image with no populated tables.
+# Integrity is a SHA-256 over the whole body plus a raw RSA-2048 signature; the
+# validator recomputes the SHA-256 (Verified tier on a match).
+struct = """
+  bytes[4] magic;
+  u8   ver;
+  u8   compress;
+  u8   sub_a;
+  u8   sub_b;
+  u16  rsvd0;
+  u8   hashsize;
+  u8   rsvd1;
+  u16  rsvd2;
+  u16  siglen;
+  u32  body_size;
+  u32  rsvd3;
+  u32  region1;
+  u32  region2;
+  u16  npart;
+  u16  nseg;
+"""
+
+constraints = [
+  "ver == 1",
+  "hashsize == 32",
+  "siglen == 256",
+  "npart <= 64",
+  "nseg <= 512",
+  "body_size >= 1",
+  "body_size <= _avail",
+]
+
+validator = "otra"   # tells segmented from flat, lists partitions, verifies SHA-256
+
+[[magic]]
+ascii = "OTRA"
+endian = "little"
+
+[doc]
+description = "Artosyn OTRA firmware upgrade image (AR8030 / VT4 / VR04; HGLRC / BetaFPV / arlink). SHA-256 + RSA-2048 signed; segmented images LZO-decompress into per-partition raw images."
+vendor = "Artosyn"

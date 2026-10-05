@@ -24,6 +24,7 @@
 #include "extract/iso9660.hpp"
 #include "extract/jffs2.hpp"
 #include "extract/ntfs.hpp"
+#include "extract/otra.hpp"
 #include "extract/rae_rfp.hpp"
 #include "extract/spiffs.hpp"
 #include "extract/squashfs.hpp"
@@ -70,6 +71,7 @@ Extractor find_extractor(const std::string& type) {
     if (type == "uboot_env") return extract_uboot_env;
     if (type == "esp32_nvs") return extract_esp32_nvs;
     if (type == "rae_rfp") return extract_rae_rfp;
+    if (type == "otra") return extract_otra;
     if (type == "wince_rom") return extract_wince_rom;
     if (type == "wince_hive") return extract_wince_hive;
     if (type == "vbf") return extract_vbf;
