@@ -56,7 +56,7 @@ bool validate_otra(ValidatorCtx& ctx) {
             for (const auto* s : sel) { comp += s->data_len; decomp += s->flash_len; }
             m.size = static_cast<size_t>(comp);  // compressed span in the file
             m.note = std::to_string(sel.size()) + (sel.size() == 1 ? " seg -> " : " segs -> ") +
-                     hex(decomp) + ((p.flags & 1u) ? " · active" : "");
+                     hex(decomp) + ((p.flags & 1u) ? " [active]" : "");
             ctx.out.members.push_back(std::move(m));
         }
     }
