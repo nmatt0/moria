@@ -1,3 +1,15 @@
+moria-fw (0.3.0-1) unstable; urgency=medium
+
+  * UPX byte-exact ELF unpacking; boot-level artifacts and verified-boot metadata.
+  * New filesystems: LittleFS and SPIFFS (identify + extract), plus identify for
+    GPT/MBR partition maps, LUKS1/2, and a legacy block-FS batch
+    (NILFS2/Minix/ReiserFS/UFS/APFS/LogFS).
+  * ESP32 partition table + NVS; UBIFS orphaned-inode recovery; standalone LZMA.
+  * Windows CE XIP ROM, MS-CAB, and CFBF/MSI compound files; Artosyn OTRA images.
+  * Per-section entropy column (-E) and a recursive extraction tree in -e output.
+
+ -- Matt Brown <matt@brownfinesecurity.com>  Mon, 05 Oct 2026 13:01:08 -0400
+
 moria-fw (0.2.1-1) unstable; urgency=medium
 
   * Debian packaging for moria; a .deb is attached to each GitHub release.
