@@ -11,7 +11,7 @@ mapfile -t SRCS < <(find src -name '*.cpp' ! -name 'main.cpp' | sort)
 # Xcode clang lacks the libFuzzer runtime; override with a clang that has it
 # (e.g. CXX=/opt/homebrew/opt/llvm/bin/clang++ on macOS).
 CXX="${CXX:-clang++}"
-for target in fuzz_scan fuzz_esp32_part fuzz_esp32_nvs; do
+for target in fuzz_scan fuzz_esp32_part fuzz_esp32_nvs fuzz_lzx; do
   "$CXX" -std=c++20 -O1 -g -fsanitize=fuzzer,address -I src -I third_party \
     -DFT_FUZZ_SIGDIR="\"$PWD/signatures\"" \
     "${SRCS[@]}" "fuzz/${target}.cpp" -o "$target"

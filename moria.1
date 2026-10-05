@@ -13,7 +13,7 @@ embedded formats (filesystems, containers, bootloaders, executables,
 compression, media) with byte offsets and confidence tiers. It is
 identification-first; with
 .B \-\-extract
-it also unpacks SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS, romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, HFS+, XFS, btrfs, EROFS, and ISO9660 filesystems, ZIP/tar/cpio archives, U-Boot uImage/FIT containers, and RAE Systems/Honeywell RFP firmware packages (LZARI-decompressing their sections)
+it also unpacks SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS, romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, HFS+, XFS, btrfs, EROFS, and ISO9660 filesystems, ZIP/tar/cpio/MS-CAB archives, CFBF compound files (Windows Installer .msi), U-Boot uImage/FIT containers, Windows CE XIP ROM images and registry hives, and RAE Systems/Honeywell RFP firmware packages (LZARI-decompressing their sections)
 internally (no sudo). Every other format is still identified and located by offset, ready for another tool such as binwalk.
 .PP
 Output is human-readable by default. A single file shows a findings tree
@@ -51,11 +51,11 @@ is not reported as an unidentified high-entropy region, so the hint fires only o
 genuinely unclaimed high-entropy data.
 .TP
 .B \-\-list
-List tar/cpio/zip member names and sizes. Does not extract.
+List tar/cpio/zip/MS-CAB member names and sizes, or a Windows CE ROM's modules and files. Does not extract.
 .SS Extract
 .TP
 .BR \-e ", " \-\-extract
-Unpack identified SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS (incl. UBI), romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, EROFS, and ISO9660 filesystems, ZIP/tar/cpio archives, U-Boot uImage/FIT containers, Android boot/sparse images, and RAE Systems/Honeywell RFP firmware packages into
+Unpack identified SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS (incl. UBI), romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, EROFS, and ISO9660 filesystems, ZIP/tar/cpio/MS-CAB archives, CFBF compound files such as Windows Installer .msi packages, U-Boot uImage/FIT containers, Android boot/sparse images, Windows CE XIP ROM images, Windows CE registry hives, and RAE Systems/Honeywell RFP firmware packages into
 .IR file .extracted/
 (one subdir per region, named
 .IR 0x<offset>\-<type> ).
@@ -91,6 +91,13 @@ output bytes (default 4294967296 = 4 GiB); the manifest is marked
 .IR capped .
 A per-extraction decompression-ratio guard (output/input over 1000:1 above
 10 MiB) also stops descent into a likely decompression bomb.
+.TP
+.B \-\-unpack\-executables
+Also unpack installer/document containers (CFBF/MSI) that are found
+inside other extracted output. By default these are unpacked only when they
+are the root container because a single .msi expands to several hundred
+database\-table streams and burying the rest of the findings under them is
+rarely what you want.
 .SS Carve
 .TP
 .BR \-c ", " \-\-carve

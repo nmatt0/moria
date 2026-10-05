@@ -41,6 +41,7 @@ struct Manifest {
     std::string source;      // source file path
     bool capped = false;     // a recursion guard (depth/files/bytes/ratio) tripped
     std::string cap_reason;  // which guard, when capped
+    size_t skipped_nested_executables = 0; // Installer/document containers found below the top level and left packed
 };
 
 // One extractor: pull `f` out of `r` into `root`, describing results in `out`.
