@@ -25,7 +25,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MORIA = os.path.join(HERE, "..", "build", "moria")
+MORIA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "build", "moria")
 
 # Two synthetic partition payloads and their genuine LZO1X-1 streams (liblzo2,
 # lzo1x_1_compress), captured offline. moria's independent decoder must reproduce

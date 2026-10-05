@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MORIA = os.path.join(HERE, "..", "build", "moria")
+MORIA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "build", "moria")
 
 ENTRIES = [
     (0x01, 0x02, 0x9000, 0x6000, "nvs"),

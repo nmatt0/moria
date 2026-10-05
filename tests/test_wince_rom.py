@@ -25,7 +25,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-MORIA = os.path.join(HERE, "..", "build", "moria")
+MORIA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "build", "moria")
 
 from lzxbuild import ce_compress_blob  # noqa: E402
 

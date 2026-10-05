@@ -268,7 +268,7 @@ if(Python3_Interpreter_FOUND)
   foreach(_t IN LISTS _moria_py_tests)
     add_test(
       NAME ${_t}
-      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/${_t}.py
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/${_t}.py $<TARGET_FILE:moria>
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
   endforeach()

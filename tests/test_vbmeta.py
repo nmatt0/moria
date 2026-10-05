@@ -15,7 +15,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MORIA = os.path.join(HERE, "..", "build", "moria")
+MORIA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "build", "moria")
 
 PUBKEY = b"AVBPUBKEY" + bytes(range(64)) * 2      # 137 bytes, distinctive
 DESCS = b"DESCRIPTORS-BLOCK" + bytes((i * 3) & 0xFF for i in range(200))

@@ -15,7 +15,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MORIA = os.path.join(HERE, "..", "build", "moria")
+MORIA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "build", "moria")
 
 # fit_keyed.its: one signed kernel image (hash-1 sha256 + signature-1
 # sha256,rsa2048), a signed conf-1 (sign-images="kernel"), and /signature/

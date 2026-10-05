@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MORIA = os.path.join(HERE, "..", "build", "moria")
+MORIA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "build", "moria")
 
 # A real qvbf-LZSS-compressed block and its exact plaintext (generated with the
 # ford-pscm-re encoder, verified round-trip). Exercises the C++ LZSS decoder's

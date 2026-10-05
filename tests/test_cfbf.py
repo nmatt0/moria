@@ -32,7 +32,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-MORIA = os.path.join(HERE, "..", "build", "moria")
+MORIA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "build", "moria")
 
 import cfbfbuild  # noqa: E402
 from test_cab import (build_cab, lzx_compressed_blocks, lzx_real_payload,  # noqa: E402
