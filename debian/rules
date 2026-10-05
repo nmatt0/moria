@@ -4,9 +4,24 @@
 # page.
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+B = obj-$(DEB_HOST_GNU_TYPE)
 
 %:
 	dh $@ --buildsystem=cmake
 
 override_dh_auto_configure:
 	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release
+
+# Run the project's deterministic gate, not the full CTest suite. ci.yml tests
+# every push in full (with the maker tools installed); the packaging build has
+# neither those tools nor a pinned upx, so the full suite would pull in checks
+# that self-skip at best and, for the upx-version-sensitive test_upx, fail. Mirror
+# ci.yml's curated, tool-independent gate here (MORIA_CI=1 skips build-sensitive
+# round-trips). See .github/workflows/ci.yml.
+override_dh_auto_test:
+	MORIA_CI=1 $(B)/moria_unit
+	MORIA_CI=1 python3 tests/test_samples.py $(B)/moria
+	MORIA_CI=1 python3 tests/test_extract.py $(B)/moria
+	MORIA_CI=1 python3 tests/test_rae_rfp.py $(B)/moria
+	MORIA_CI=1 python3 tests/test_vbf.py $(B)/moria
