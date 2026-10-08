@@ -1760,10 +1760,12 @@ def test_btrfs(work, src, expected):
     return 1
 
 
-def build_squashfs(be, compress):
+def build_squashfs(be, compress, prefix=b"", absolute_offsets=False):
     """Hand-build a minimal, valid SquashFS v4 (LE or BE, raw or gzip) with the
     tree /file1="hello\\n", /sub/file2="world!\\n". No mksquashfs needed; the point
-    is big-endian ("sqsh") images, which no tool can create."""
+    is big-endian ("sqsh") images, which no tool can create. A prefix can wrap
+    the filesystem with either standard relative or vendor-style absolute
+    pointers into the containing file."""
     import struct
     import zlib
     E = ">" if be else "<"
@@ -1772,6 +1774,7 @@ def build_squashfs(be, compress):
     u32 = lambda v: struct.pack(E + "I", v)
     u64 = lambda v: struct.pack(E + "Q", v)
     BLOCK, BLOCK_LOG, UNCOMP_BLOCK, META_UNCOMP = 131072, 17, 1 << 24, 0x8000
+    pointer_bias = len(prefix) if absolute_offsets else 0
 
     def meta(p):
         if compress:
@@ -1795,8 +1798,8 @@ def build_squashfs(be, compress):
     f1_disk, f1_sf = datablock(f1)
     f2_disk, f2_sf = datablock(f2)
     blob = bytearray(96)
-    f1_start = len(blob); blob += f1_disk
-    f2_start = len(blob); blob += f2_disk
+    f1_start = len(blob) + pointer_bias; blob += f1_disk
+    f2_start = len(blob) + pointer_bias; blob += f2_disk
 
     DIR_SZ, FILE_SZ = 32, 36
     off_root, off_sub = 0, 32
@@ -1812,10 +1815,10 @@ def build_squashfs(be, compress):
                      dir_inode(2, 0, len(root_listing), len(sub_listing), 1) +
                      file_inode(3, f1_start, len(f1), f1_sf) +
                      file_inode(4, f2_start, len(f2), f2_sf))
-    inode_table_start = len(blob); blob += meta(inode_payload)
-    directory_table_start = len(blob); blob += meta(root_listing + sub_listing)
-    id_meta_off = len(blob); blob += meta(u32(0))
-    id_table_start = len(blob); blob += u64(id_meta_off)
+    inode_table_start = len(blob) + pointer_bias; blob += meta(inode_payload)
+    directory_table_start = len(blob) + pointer_bias; blob += meta(root_listing + sub_listing)
+    id_meta_off = len(blob) + pointer_bias; blob += meta(u32(0))
+    id_table_start = len(blob) + pointer_bias; blob += u64(id_meta_off)
     bytes_used = len(blob)
 
     sb = (b"sqsh" if be else b"hsqs") + u32(4) + u32(0) + u32(BLOCK) + u32(0) + u16(1) + \
@@ -1824,7 +1827,7 @@ def build_squashfs(be, compress):
         u64(directory_table_start) + u64(0xFFFFFFFFFFFFFFFF) + u64(0xFFFFFFFFFFFFFFFF)
     assert len(sb) == 96, len(sb)
     blob[0:96] = sb
-    return bytes(blob)
+    return prefix + bytes(blob)
 
 
 def test_squashfs_endian(work):
@@ -1833,32 +1836,40 @@ def test_squashfs_endian(work):
     failures = 0
     for be in (False, True):
         for comp in (False, True):
-            label = ("BE" if be else "LE") + ("/gzip" if comp else "/raw")
-            img = os.path.join(work, f"sq_{label.replace('/', '_')}.bin")
-            with open(img, "wb") as fh:
-                fh.write(build_squashfs(be, comp))
-            outdir = os.path.join(work, f"sq_{label.replace('/', '_')}.out")
-            r = subprocess.run([MORIA, "-j", "--extract", "-C", outdir, img], capture_output=True)
-            try:
-                entry = json.loads(r.stdout.decode())["extraction"]["extracted"][0]
-            except Exception:
-                print(f"FAIL [squashfs {label}]: no extraction manifest\n{r.stdout[:200]}")
-                failures += 1
-                continue
-            root = os.path.join(outdir, entry["root"])
-            try:
-                got1 = open(os.path.join(root, "file1"), "rb").read()
-                got2 = open(os.path.join(root, "sub", "file2"), "rb").read()
-            except OSError as e:
-                print(f"FAIL [squashfs {label}]: missing file ({e})")
-                failures += 1
-                continue
-            if entry["status"] == "ok" and got1 == b"hello\n" and got2 == b"world!\n":
-                print(f"PASS [squashfs {label}]: file1 + sub/file2 recovered")
-            else:
-                print(f"FAIL [squashfs {label}]: status={entry['status']} "
-                      f"file1={got1!r} file2={got2!r}")
-                failures += 1
+            for mode in ("native", "wrapped-relative", "wrapped-absolute"):
+                label = ("BE" if be else "LE") + ("/gzip" if comp else "/raw") + "/" + mode
+                img = os.path.join(work, f"sq_{label.replace('/', '_')}.bin")
+                prefix = b"OGWRAP00" if mode != "native" else b""
+                with open(img, "wb") as fh:
+                    fh.write(build_squashfs(be, comp, prefix,
+                                           absolute_offsets=(mode == "wrapped-absolute")))
+                outdir = os.path.join(work, f"sq_{label.replace('/', '_')}.out")
+                r = subprocess.run([MORIA, "-j", "--extract", "-C", outdir, img], capture_output=True)
+                try:
+                    entry = next(e for e in json.loads(r.stdout.decode())["extraction"]["extracted"]
+                                 if e["type"] == "squashfs")
+                except (ValueError, KeyError, StopIteration):
+                    print(f"FAIL [squashfs {label}]: no extraction manifest\n{r.stdout[:200]}")
+                    failures += 1
+                    continue
+                root = os.path.join(outdir, entry["root"])
+                try:
+                    got1 = open(os.path.join(root, "file1"), "rb").read()
+                    got2 = open(os.path.join(root, "sub", "file2"), "rb").read()
+                except OSError as e:
+                    print(f"FAIL [squashfs {label}]: missing file ({e})")
+                    failures += 1
+                    continue
+                absolute_detected = any("offsets are absolute" in warning
+                                        for warning in entry.get("warnings", []))
+                if (entry["status"] == "ok" and got1 == b"hello\n" and got2 == b"world!\n"
+                        and absolute_detected == (mode == "wrapped-absolute")):
+                    print(f"PASS [squashfs {label}]: file1 + sub/file2 recovered")
+                else:
+                    print(f"FAIL [squashfs {label}]: status={entry['status']} "
+                          f"file1={got1!r} file2={got2!r} "
+                          f"absolute_offsets={absolute_detected}")
+                    failures += 1
     return failures
 
 

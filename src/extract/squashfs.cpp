@@ -70,8 +70,11 @@ struct Ctx {
     // A compressed block had valid framing (in-range metadata length or block
     // size) but the payload would not decompress. When this is set and nothing
     // was recovered, the image is structurally a squashfs whose compressed data
-    // is undecodable - the fingerprint of vendor payload obfuscation/encryption.
+    // did not decode under the supported pointer and codec interpretations.
     bool decode_failed_valid_frame = false;
+    // Most images store pointers relative to the superblock. Some wrapped
+    // firmware stores them relative to the whole file.
+    size_t offset_base = 0;
 };
 
 // A cursor over a metadata stream: decompresses successive metadata blocks
@@ -207,11 +210,11 @@ bool parse_super(Ctx& c) {
 // decodes it, preferring the declared codec so normal images are unchanged.
 Compressor detect_compressor(Ctx& c) {
     Compressor declared = static_cast<Compressor>(c.sb.compression);
-    auto hdr = c.r.at<uint16_t>(c.base + c.sb.inode_table_start, c.endian);
+    auto hdr = c.r.at<uint16_t>(c.offset_base + c.sb.inode_table_start, c.endian);
     if (!hdr) return declared;
     size_t size = *hdr & 0x7fff;
     if ((*hdr & META_UNCOMPRESSED) || size == 0 || size > METADATA_MAX) return declared;
-    auto blk = c.r.bytes(c.base + c.sb.inode_table_start + 2, size);
+    auto blk = c.r.bytes(c.offset_base + c.sb.inode_table_start + 2, size);
     if (!blk) return declared;
     const Compressor cands[] = {declared,      Compressor::Xz,  Compressor::Lzma, Compressor::Gzip,
                                 Compressor::Lzo, Compressor::Lz4, Compressor::Zstd};
@@ -224,7 +227,7 @@ Compressor detect_compressor(Ctx& c) {
 bool read_inode(Ctx& c, uint64_t ref, Inode& node) {
     size_t block = static_cast<size_t>(ref >> 16);
     size_t offset = static_cast<size_t>(ref & 0xffff);
-    MetaReader mr{c, c.base + c.sb.inode_table_start + block};
+    MetaReader mr{c, c.offset_base + c.sb.inode_table_start + block};
     if (!mr.skip(offset)) return false;
 
     uint16_t type, mode, uid, gid;
@@ -310,15 +313,29 @@ bool read_inode(Ctx& c, uint64_t ref, Inode& node) {
     return true;
 }
 
+bool root_directory_decodes(Ctx& c) {
+    if (!compressor_supported(c.comp)) return false;
+    Inode root;
+    if (!read_inode(c, c.sb.root_inode, root) || (root.type != 1 && root.type != 8) ||
+        root.dir_size < 3)
+        return false;
+    MetaReader dir{c, c.offset_base + c.sb.directory_table_start + root.dir_start_block};
+    if (!dir.skip(root.dir_offset)) return false;
+    // Non-empty directories begin with a 12-byte directory header. Checking
+    // that it decodes avoids accepting a coincidental inode type at the wrong
+    // pointer base.
+    return root.dir_size == 3 || dir.ensure(12);
+}
+
 // Locate the fragment entry `index`: (start, on-disk size, uncompressed?).
 bool read_fragment_entry(Ctx& c, uint32_t index, uint64_t& start, uint32_t& size, bool& uncomp) {
     // Indirect: fragment_table_start is an array of u64 pointers to metadata
     // blocks, each holding up to 512 fragment entries (16 bytes each).
     size_t block_index = index / 512;
     size_t entry_in_block = index % 512;
-    auto ptr = c.r.at<uint64_t>(c.base + c.sb.fragment_table_start + block_index * 8, c.endian);
+    auto ptr = c.r.at<uint64_t>(c.offset_base + c.sb.fragment_table_start + block_index * 8, c.endian);
     if (!ptr) return false;
-    MetaReader mr{c, c.base + *ptr};
+    MetaReader mr{c, c.offset_base + *ptr};
     if (!mr.skip(entry_in_block * 16)) return false;
     uint64_t frag_start;
     uint32_t frag_size, unused;
@@ -337,7 +354,7 @@ bool read_file_data(Ctx& c, const Inode& node, std::vector<uint8_t>& contents) {
     uint64_t spent = c.out.bytes;
     if (spent + node.file_size > c.byte_budget) { c.truncated = true; return false; }
     contents.reserve(std::min<size_t>(static_cast<size_t>(node.file_size), 16u << 20));
-    size_t dpos = c.base + node.blocks_start;
+    size_t dpos = c.offset_base + node.blocks_start;
     uint64_t remaining = node.file_size;
     for (uint32_t bs : node.block_sizes) {
         size_t on_disk = bs & 0xffffff;
@@ -366,7 +383,7 @@ bool read_file_data(Ctx& c, const Inode& node, std::vector<uint8_t>& contents) {
         uint32_t fsize;
         bool funcomp;
         if (!read_fragment_entry(c, node.fragment, fstart, fsize, funcomp)) return false;
-        auto data = c.r.bytes(c.base + fstart, fsize);
+        auto data = c.r.bytes(c.offset_base + fstart, fsize);
         if (!data) return false;
         std::vector<uint8_t> fragblk;
         if (funcomp) {
@@ -398,7 +415,7 @@ void walk(Ctx& c, uint64_t ref, const std::string& rel, size_t depth) {
             if (!c.root.make_dir(c.subdir + "/" + rel) && !rel.empty()) return;
             c.out.dirs++;
             // Read the directory listing from the directory table.
-            MetaReader dr{c, c.base + c.sb.directory_table_start + node.dir_start_block};
+            MetaReader dr{c, c.offset_base + c.sb.directory_table_start + node.dir_start_block};
             if (!dr.skip(node.dir_offset)) { c.truncated = true; return; }
             size_t listing = node.dir_size >= 3 ? node.dir_size - 3 : 0;
             size_t start_idx = dr.idx;
@@ -482,7 +499,23 @@ bool extract_squashfs(const Reader& r, const Finding& f, SafeRoot& root, const s
     // rarely exceeds a few x) but bounded, so a tiny crafted image can't force
     // a multi-GiB write. Floor keeps small legit images working.
     c.byte_budget = std::max<uint64_t>(uint64_t(2) << 30, uint64_t(c.sb.bytes_used) * 256);
+    // Prefer standard SquashFS-relative pointers. Only fall back to file-
+    // absolute pointers when the root inode cannot be decoded normally and the
+    // alternate interpretation yields a valid root directory. This avoids
+    // changing behavior for ordinary embedded SquashFS images.
+    c.offset_base = c.base;
     c.comp = detect_compressor(c);  // trust the payload, not a possibly-lying field
+    if (c.base != 0 && !root_directory_decodes(c)) {
+        c.offset_base = 0;
+        c.comp = detect_compressor(c);
+        if (root_directory_decodes(c)) {
+            c.decode_failed_valid_frame = false;
+            out.warnings.push_back("SquashFS offsets are absolute to the containing file");
+        } else {
+            c.offset_base = c.base;
+            c.comp = detect_compressor(c);
+        }
+    }
     if (!compressor_supported(c.comp)) {
         out.status = "unsupported:" + std::string(compressor_name(c.comp));
         return true;
@@ -494,20 +527,18 @@ bool extract_squashfs(const Reader& r, const Finding& f, SafeRoot& root, const s
     walk(c, c.sb.root_inode, "", 0);
 
     // Nothing recovered from a structurally valid squashfs. Probe the inode
-    // table's first metadata block directly: a genuine squashfs decodes it, but
-    // a vendor-obfuscated/encrypted image has valid framing (superblock + block
-    // headers) over a compressed payload that will not decode. Distinguish that
-    // from an ordinary corrupt/truncated image so the user knows this is not a
-    // moria/binwalk limitation but a deliberately modified image.
+    // table's first metadata block directly. Valid framing with an undecodable
+    // payload can mean obfuscation, encryption, or an unsupported layout; do not
+    // claim that the cause is known from this probe alone.
     if (out.files == 0 && out.dirs == 0 && out.symlinks == 0) {
         bool obfuscated = c.decode_failed_valid_frame;
-        auto hdr = c.r.at<uint16_t>(c.base + c.sb.inode_table_start, Endian::Little);
+        auto hdr = c.r.at<uint16_t>(c.offset_base + c.sb.inode_table_start, c.endian);
         if (hdr) {
             size_t size = *hdr & 0x7fff;
             bool uncompressed = (*hdr & META_UNCOMPRESSED) != 0;
             // Only judge when the pointed-at data is actually present (rules out
             // an ordinary truncated dump, where it runs past EOF).
-            if (auto blk = c.r.bytes(c.base + c.sb.inode_table_start + 2,
+            if (auto blk = c.r.bytes(c.offset_base + c.sb.inode_table_start + 2,
                                      std::min<size_t>(size, METADATA_MAX))) {
                 if (size == 0 || (!uncompressed && size > METADATA_MAX)) {
                     obfuscated = true;  // metadata length inconsistent with a valid superblock
@@ -519,8 +550,8 @@ bool extract_squashfs(const Reader& r, const Finding& f, SafeRoot& root, const s
         if (obfuscated) {
             out.warnings.push_back(
                 std::string(compressor_name(c.comp)) +
-                " payload did not decode despite a valid squashfs structure - likely "
-                "vendor obfuscation/encryption of the compressed data (not a moria limitation)");
+                " payload did not decode despite a valid squashfs structure - possible "
+                "vendor obfuscation/encryption or unsupported layout");
             out.status = "error:undecodable-payload";
             return true;
         }
