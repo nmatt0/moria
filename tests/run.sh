@@ -35,6 +35,9 @@ python3 tests/test_legacy_fs.py
 python3 tests/test_luks.py
 # Legacy standalone .lzma identify (verified via trial-decode) + byte-exact extract + FP guards.
 python3 tests/test_lzma.py
+# Ingenic jzlzma (hardware LZ77) identify (verified via trial-decode) + byte-exact
+# extract + recursion + FP guards.
+python3 tests/test_jzlzma.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
 python3 tests/test_rae_rfp.py
 # Windows CE XIP ROM: ROMHDR resolution, module PE rebuild, CECompress decode.

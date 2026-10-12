@@ -1,0 +1,45 @@
+name = "jzlzma"
+category = "compression"
+
+# Ingenic "mark_rootfs_lzma" wrapper around the SoC's hardware-LZ77 stream
+# (jzlzma), used for kernel/rootfs images on T-series (T10/T20/T23/T30) IP
+# camera firmware. The wrapper reuses the U-Boot magic 0x27051956, stored
+# little-endian at +4 — the big-endian uImage header magic at +0 can never
+# collide with it:
+#   [0..4)  payload_size  u32   the bitstream after this 16-byte header
+#   [4..8)  magic         u32   0x27051956
+#   [8..12) dict_size     u32   decoder window (64 KiB on observed devices)
+#   [12..16) uncomp_size  u32   exact decoded size
+#   [16..)  jzlzma bitstream
+# The validator trial-decodes the declared payload to exactly uncomp_size
+# bytes, so a stray magic with plausible fields cannot false-positive.
+struct = """
+  u32 payload_size;
+  u32 magic;
+  u32 dict_size;
+  u32 uncomp_size;
+"""
+
+constraints = [
+  "payload_size > 0",
+  "payload_size + 16 <= _avail",
+  "dict_size > 0",
+  "dict_size <= 0x10000000",
+  "uncomp_size > 0",
+  "uncomp_size <= 0x10000000",
+]
+
+size = "payload_size + 16"
+validator = "jzlzma"
+magic_offset = 4
+confidence = "structural"
+
+[[magic]]
+hex = "56190527"
+endian = "little"
+
+[doc]
+description = "Ingenic jzlzma (hardware LZ77) compressed data: kernel/rootfs images on T-series SoC IP cameras (Wansview, Kiwibit and similar)."
+references = [
+  { title = "binwalk PR #957 — jzlzma detection + decompressor", url = "https://github.com/ReFirmLabs/binwalk/pull/957" },
+]

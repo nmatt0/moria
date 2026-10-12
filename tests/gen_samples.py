@@ -344,6 +344,124 @@ def lzma_alone():
     return lzma.compress(payload, format=lzma.FORMAT_ALONE)
 
 
+def _jz_encode(payload: bytes) -> bytes:
+    """Greedy jzlzma encoder mirroring src/extract/jzlzma.cpp, for fixtures.
+
+    Deliberately mixes opcodes (alternating rep / new-distance preference) so
+    the round trips in test_jzlzma.py and the unit tests exercise literals,
+    all three length bands, every position-slot class, the rep0 one-byte
+    shortcut and the rep1/rep2/rep3 rotations.
+    """
+    bits = []
+
+    def bit(b):
+        bits.append(b & 1)
+
+    def num(v, n):  # n bits, MSB-first, as the decoder reads them
+        for i in range(n - 1, -1, -1):
+            bit((v >> i) & 1)
+
+    def rev(v, n):
+        r = 0
+        for i in range(n):
+            r = (r << 1) | ((v >> i) & 1)
+        return r
+
+    def enc_len(length):  # 2..273, LZMA's three bands
+        if length <= 9:
+            bit(0); num(length - 2, 3)
+        elif length <= 17:
+            bit(1); bit(0); num(length - 10, 3)
+        else:
+            bit(1); bit(1); num(length - 18, 8)
+
+    def enc_dist(pos):  # distance minus one
+        if pos < 4:
+            num(pos, 6)
+            return
+        for slot in range(4, 64):
+            n = (slot >> 1) - 1
+            base = (2 | (slot & 1)) << n
+            if pos < base + (1 << n):
+                num(slot, 6)
+                extra = pos - base
+                if slot < 14:
+                    num(rev(extra, n), n)      # extra bits stored reversed
+                else:
+                    num(extra >> 4, n - 4)     # align: high natural, low 4 reversed
+                    num(rev(extra & 0xF, 4), 4)
+                return
+
+    reps = [0, 0, 0, 0]
+    i, total = 0, len(payload)
+
+    def match_len(i, d):
+        l = 0
+        while l < 273 and i + l < total and payload[i + l] == payload[i + l - d]:
+            l += 1
+        return l
+
+    while i < total:
+        best_rep, best_len = -1, 0
+        for r in range(4):
+            d = reps[r] + 1
+            if d > i:
+                continue
+            l = match_len(i, d)
+            if l >= (1 if r == 0 else 2) and l > best_len:
+                best_len, best_rep = l, r
+        new_len, new_d = 0, 0
+        for d in range(1, i + 1):
+            l = match_len(i, d)
+            if l >= 2 and l > new_len:
+                new_len, new_d = l, d
+        if new_len >= 2 and (new_len > best_len or (i % 2 == 0 and new_len == best_len)):
+            bit(1); bit(0)
+            enc_len(new_len)
+            enc_dist(new_d - 1)
+            reps = [new_d - 1] + reps[:3]
+            i += new_len
+        elif best_rep >= 0:
+            bit(1); bit(1)
+            if best_rep == 0:
+                bit(0)
+                bit(0 if best_len == 1 else 1)   # one-byte shortcut vs explicit length
+            else:
+                bit(1)
+                if best_rep == 1:
+                    bit(0)
+                else:
+                    bit(1); bit(0 if best_rep == 2 else 1)
+                reps = [reps[best_rep]] + reps[:best_rep] + reps[best_rep + 1:]
+            if best_len > 1 or best_rep != 0:
+                enc_len(best_len)
+            i += best_len
+        else:
+            bit(0)
+            num(payload[i], 8)
+            i += 1
+
+    out = bytearray()
+    for j in range(0, len(bits), 8):
+        byte = 0
+        for k, b in enumerate(bits[j:j + 8]):
+            byte |= b << k
+        out.append(byte)
+    return bytes(out)
+
+
+def jzlzma_stream(payload: bytes) -> bytes:
+    """A genuine mark_rootfs_lzma-wrapped jzlzma encoding of `payload` (the
+    validator trial-decodes, so the fixture must be real)."""
+    stream = _jz_encode(payload)
+    return struct.pack("<IIII", len(stream), 0x27051956, 0x10000, len(payload)) + stream
+
+
+def jzlzma():
+    payload = b"MORIA jzlzma fixture: the quick brown fox. " * 200
+    return jzlzma_stream(payload)
+
+
 def cpio_newc():
     fields = ["00000000"] * 13
     fields[6] = "00000000"   # c_filesize
@@ -1251,6 +1369,7 @@ MANIFEST = [
     ("blob.lz4l", lz4_legacy, "lz4_legacy", STRUCTURAL),
     ("blob.zst", zstd, "zstd", STRUCTURAL),
     ("blob.lzma", lzma_alone, "lzma", VERIFIED),
+    ("blob.jzlzma", jzlzma, "jzlzma", VERIFIED),
     ("initramfs.cpio", cpio_newc, "cpio", CONSISTENT),
     ("archive.tar", tar, "tar", STRUCTURAL),
     ("archive.7z", sevenzip, "7z", STRUCTURAL),
