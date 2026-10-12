@@ -43,6 +43,10 @@ public:
         return true;
     }
 
+    // Whole input bytes touched so far (the final opcode's tail bits count as
+    // a consumed byte).
+    size_t consumed() const { return cur_ + (bit_ != 0 ? 1 : 0); }
+
 private:
     std::span<const uint8_t> d_;
     size_t cur_ = 0;
@@ -97,7 +101,8 @@ std::optional<uint32_t> decode_dist(BitReader& br) {
 }  // namespace
 
 std::optional<std::vector<uint8_t>> jzlzma_decode(std::span<const uint8_t> stream,
-                                                  size_t out_size) {
+                                                  size_t out_size, size_t* consumed,
+                                                  bool allow_short) {
     if (out_size > kJzlzmaMaxOut) return std::nullopt;
     std::vector<uint8_t> out;
     if (out_size == 0) return out;
@@ -106,12 +111,23 @@ std::optional<std::vector<uint8_t>> jzlzma_decode(std::span<const uint8_t> strea
     BitReader br(stream);
     uint32_t reps[4] = {0, 0, 0, 0};
 
+    // In allow_short mode any failure after real output is a stop, not an
+    // error: return the produced prefix (the caller checks the shortfall).
+    auto stop = [&](bool failed) -> std::optional<std::vector<uint8_t>> {
+        if (!failed) return std::nullopt;  // unused for success paths
+        if (allow_short && !out.empty()) {
+            if (consumed) *consumed = br.consumed();
+            return std::move(out);
+        }
+        return std::nullopt;
+    };
+
     while (out.size() < out_size) {
         int b = br.next();
-        if (b < 0) return std::nullopt;  // input ended before the declared size
+        if (b < 0) return stop(true);  // input ended before the declared size
         if (b == 0) {                    // literal
             uint32_t v = 0;
-            if (!br.read(8, v)) return std::nullopt;
+            if (!br.read(8, v)) return stop(true);
             out.push_back(static_cast<uint8_t>(v));
             continue;
         }
@@ -121,12 +137,12 @@ std::optional<std::vector<uint8_t>> jzlzma_decode(std::span<const uint8_t> strea
         // their length after the opcode bits.
         size_t size = 0;
         b = br.next();
-        if (b < 0) return std::nullopt;
+        if (b < 0) return stop(true);
         if (b == 0) {  // new distance
             auto len = decode_length(br);
-            if (!len) return std::nullopt;
+            if (!len) return stop(true);
             auto dist = decode_dist(br);
-            if (!dist) return std::nullopt;
+            if (!dist) return stop(true);
             reps[3] = reps[2];
             reps[2] = reps[1];
             reps[1] = reps[0];
@@ -134,18 +150,18 @@ std::optional<std::vector<uint8_t>> jzlzma_decode(std::span<const uint8_t> strea
             size = *len;
         } else {
             b = br.next();
-            if (b < 0) return std::nullopt;
+            if (b < 0) return stop(true);
             if (b == 0) {  // rep0
                 b = br.next();
-                if (b < 0) return std::nullopt;
+                if (b < 0) return stop(true);
                 if (b == 0) size = 1;  // one-byte rep0 shortcut; else explicit length
             } else {         // rep1/rep2/rep3
                 b = br.next();
-                if (b < 0) return std::nullopt;
+                if (b < 0) return stop(true);
                 uint32_t idx = 1;
                 if (b != 0) {
                     b = br.next();
-                    if (b < 0) return std::nullopt;
+                    if (b < 0) return stop(true);
                     idx = (b == 0) ? 2 : 3;
                 }
                 uint32_t v = reps[idx];
@@ -155,12 +171,12 @@ std::optional<std::vector<uint8_t>> jzlzma_decode(std::span<const uint8_t> strea
         }
         if (size == 0) {
             auto len = decode_length(br);
-            if (!len) return std::nullopt;
+            if (!len) return stop(true);
             size = *len;
         }
 
         const size_t dist = static_cast<size_t>(reps[0]) + 1;
-        if (dist > out.size()) return std::nullopt;  // reaches before the output start
+        if (dist > out.size()) return stop(true);  // reaches before the output start
         const size_t start = out.size() - dist;
         // Byte-by-byte so an overlapping match (distance < length) replicates,
         // as in LZMA. A final match claiming past out_size is corruption, but
@@ -168,6 +184,7 @@ std::optional<std::vector<uint8_t>> jzlzma_decode(std::span<const uint8_t> strea
         const size_t take = std::min(size, out_size - out.size());
         for (size_t k = 0; k < take; ++k) out.push_back(out[start + k]);
     }
+    if (consumed) *consumed = br.consumed();
     return out;
 }
 

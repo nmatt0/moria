@@ -39,10 +39,20 @@ namespace ft {
 constexpr uint32_t kJzlzmaMaxOut = uint32_t(256) << 20;
 
 // Decode the jzlzma bitstream in `stream` (the bytes after the 16-byte wrapper
-// header) to exactly `out_size` bytes. Returns nullopt on a truncated stream
-// (input exhausted first) or a corrupt one (a distance reaching before the
-// start of the output). `out_size` must be <= kJzlzmaMaxOut; the output buffer
-// is reserved up front.
-std::optional<std::vector<uint8_t>> jzlzma_decode(std::span<const uint8_t> stream, size_t out_size);
+// header, or after the 8-byte raw dict+size pair) to exactly `out_size` bytes.
+// Returns nullopt on a truncated stream (input exhausted first) or a corrupt
+// one (a distance reaching before the start of the output). `out_size` must be
+// <= kJzlzmaMaxOut; the output buffer is reserved up front. When `consumed` is
+// non-null it receives the number of input bytes the decode actually read —
+// the stream self-terminates at out_size, so this locates the logical end of
+// the bitstream inside a larger span (it includes the final opcode's bits, so
+// it may overshoot by a few bits). With `allow_short`, a stream that runs out
+// of input early returns what it produced so far instead of failing — for the
+// padded-stream convention (declared size slightly beyond the real payload,
+// Wyze Cam v4 T41 images over-declare by ~1 KiB of NUL-literal padding); the
+// caller decides whether the shortfall is acceptable.
+std::optional<std::vector<uint8_t>> jzlzma_decode(std::span<const uint8_t> stream, size_t out_size,
+                                                  size_t* consumed = nullptr,
+                                                  bool allow_short = false);
 
 }  // namespace ft

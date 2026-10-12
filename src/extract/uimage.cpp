@@ -8,10 +8,12 @@
 #include <algorithm>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
 #include "extract/decompress.hpp"
+#include "extract/jzlzma.hpp"
 #include "extract/safepath.hpp"
 
 namespace ft {
@@ -70,6 +72,36 @@ bool extract_uimage(const Reader& r, const Finding& f, SafeRoot& root, const std
             if (auto d = decompress_stream(*codec, *src, MAX_PAYLOAD)) {
                 data = std::move(*d);
                 ok = !data.empty();
+            }
+        }
+        if (!ok && comp == COMP_LZMA && src->size() >= 8) {
+            // Some SoC vendors (Ingenic T40/T41, e.g. Wyze Cam v4) ship their
+            // hardware-LZ77 "jzlzma" stream under ih_comp = lzma. The payload
+            // leads with an 8-byte dict+size mini-header; try the jzlzma
+            // decoder before giving up.
+            const uint64_t jz_dict = (uint64_t((*src)[3]) << 24) | (uint64_t((*src)[2]) << 16) |
+                                     (uint64_t((*src)[1]) << 8) | uint64_t((*src)[0]);
+            const uint64_t jz_uncomp = (uint64_t((*src)[7]) << 24) | (uint64_t((*src)[6]) << 16) |
+                                       (uint64_t((*src)[5]) << 8) | uint64_t((*src)[4]);
+            if (jz_dict > 0 && jz_dict <= kJzlzmaMaxOut && jz_uncomp > 0 &&
+                jz_uncomp <= kJzlzmaMaxOut) {
+                size_t consumed = 0;
+                auto jz = jzlzma_decode(std::span<const uint8_t>(*src).subspan(8),
+                                        static_cast<size_t>(jz_uncomp), &consumed);
+                if (!jz && jz_uncomp >= 4096) {
+                    // Padded-stream convention (T41 images over-declare by
+                    // ~1 KiB): accept a short decode covering >= 90%.
+                    jz = jzlzma_decode(std::span<const uint8_t>(*src).subspan(8),
+                                       static_cast<size_t>(jz_uncomp), &consumed,
+                                       /*allow_short=*/true);
+                    if (jz && jz->size() < (static_cast<size_t>(jz_uncomp) * 9) / 10) jz.reset();
+                }
+                if (jz) {
+                    data = std::move(*jz);
+                    ok = true;
+                    out.warnings.push_back("payload is Ingenic jzlzma (not LZMA); decoded " +
+                                           std::to_string(data.size()) + " bytes");
+                }
             }
         }
         if (!ok) {

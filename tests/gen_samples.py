@@ -462,6 +462,13 @@ def jzlzma():
     return jzlzma_stream(payload)
 
 
+def jzlzma_raw():
+    # The raw (unwrapped) form: dict+size pair + stream, no payload_size/magic
+    # prefix — the payload shape of a uImage with ih_comp = lzma on T40/T41.
+    payload = b"MORIA jzlzma-raw fixture: pack my box with five dozen liquor jugs. " * 200
+    return jzlzma_stream(payload)[8:]
+
+
 def cpio_newc():
     fields = ["00000000"] * 13
     fields[6] = "00000000"   # c_filesize
@@ -1370,6 +1377,7 @@ MANIFEST = [
     ("blob.zst", zstd, "zstd", STRUCTURAL),
     ("blob.lzma", lzma_alone, "lzma", VERIFIED),
     ("blob.jzlzma", jzlzma, "jzlzma", VERIFIED),
+    ("blob.jzlzma-raw", jzlzma_raw, "jzlzma-raw", VERIFIED),
     ("initramfs.cpio", cpio_newc, "cpio", CONSISTENT),
     ("archive.tar", tar, "tar", STRUCTURAL),
     ("archive.7z", sevenzip, "7z", STRUCTURAL),
