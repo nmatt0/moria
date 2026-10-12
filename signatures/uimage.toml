@@ -22,6 +22,11 @@ constraints = [
 
 size = "ih_size + 64"          # 64-byte header + payload
 validator = "uimage"           # verifies header CRC32 -> `verified`, decodes arch/comp/name
+# NOTE: the 64-byte header is always big-endian, but the PAYLOAD endianness is
+# not recorded by the format (ih_arch names the CPU family only). Finding.endian
+# always reflects the header/magic; the validator emits an
+# `uimage-payload-endian-unknown` info diagnostic so consumers do not read
+# "big/mips" as a claim about the payload.
 
 # U-Boot legacy uImage. 64-byte big-endian header with a header CRC32.
 [[magic]]
