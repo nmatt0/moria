@@ -150,7 +150,6 @@ add_executable(moria
   src/extract/littlefs.cpp
   src/validators/luks.cpp
   src/validators/jzlzma.cpp
-  src/validators/jzlzma_raw.cpp
   src/validators/lzma.cpp
 )
 target_include_directories(moria PRIVATE src third_party)

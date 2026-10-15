@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
-"""Raw (unwrapped) Ingenic jzlzma regression: the dict+size mini-header form
-found as the 'lzma' payload of uImages on T40/T41 (Wyze Cam v4).
+"""Raw (unwrapped) Ingenic jzlzma: the dict+size mini-header form found as the
+'lzma' payload of uImages on T40/T41 (Wyze Cam v4).
 
-moria must recognize [dict u32 LE][uncomp u32 LE][stream] with no wrapper,
-trial-decode to exactly uncomp_size, and under -e decompress byte-exact.
+Raw jzlzma is a magicless, checksumless, non-entropy-coded bitstream, so it has
+no standalone identity moria can gate without false positives: a run of 0x00
+bytes decodes as an unbounded run of literal-zero opcodes that never errors, so
+any region whose first bytes resemble a dict/size header followed by low-entropy
+or zero-padded data (ubiquitous in firmware) "trial-decodes" to the declared
+size. There is NO standalone jzlzma-raw scan signature for that reason. The raw
+form is instead decoded only where a container tells us to expect it: a uImage
+whose ih_comp = lzma whose payload fails a standard-LZMA decode.
 
 Layers:
-  1. Identify a raw stream at a nonzero offset -> verified, exact size.
-  2. Extract byte-exact.
-  3. Nested inside a uImage with ih_comp = 3: extractor must decode via the
-     jzlzma fallback and warn (payload is jzlzma, not LZMA).
-  4. FP guards: random payload, size+1 unreachable, past-EOF, zero fields,
-     and no double-report when the same stream sits in a mark_rootfs_lzma
-     wrapper.
+  1. uImage ih_comp = 3 wrapping a raw stream: the extractor decodes it via the
+     jzlzma fallback and warns (payload is jzlzma, not LZMA).
+  2. FP regression (the reason the standalone scanner was removed): low-entropy
+     and zero-padded buffers carrying a plausible dict/size header must NOT
+     produce any jzlzma finding, and the jzlzma-raw type must not exist at all.
+  3. The wrapped form is still owned by the "jzlzma" signature (real magic), and
+     a raw stream on its own is intentionally not identified as a finding.
 
 Run: python3 tests/test_jzlzma_raw.py
 """
@@ -40,8 +46,21 @@ def moria_json(data: bytes, extra=None):
     return json.loads(r.stdout)
 
 
+def all_types(data: bytes):
+    """Every finding type anywhere in the tree."""
+    out = []
+
+    def rec(nodes):
+        for x in nodes:
+            out.append(x.get("type"))
+            rec(x.get("children", []) or [])
+
+    rec(moria_json(data).get("findings", []))
+    return out
+
+
 def raw_stream(payload: bytes) -> bytes:
-    """Genuine raw jzlzma encoding: [dict][uncomp][stream] (no wrapper)."""
+    """A genuine raw jzlzma encoding: [dict][uncomp][stream] (no wrapper)."""
     wrapped = gen_samples.jzlzma_stream(payload)  # 16-byte header + stream
     return wrapped[8:]  # strip payload_size + magic; keep dict + uncomp
 
@@ -70,79 +89,53 @@ def main():
         if not cond:
             fails.append(msg)
 
-    def raw_findings(data: bytes):
-        return [x for x in moria_json(data).get("findings", []) if x["type"] == "jzlzma-raw"]
-
-    # --- 1. identify at a nonzero offset ------------------------------------
     payload = b"raw jzlzma regression payload. " * 300
-    stream = raw_stream(payload)
-    pad = 0x400
-    image = b"\xff" * pad + stream + b"\x00" * 32
-    g = raw_findings(image)
-    check(len(g) == 1, f"identify: expected one jzlzma-raw finding, got {len(g)}")
-    if g:
-        f = g[0]
-        check(f["offset"] == pad, f"offset {f['offset']} != {pad}")
-        check(f["size"] == len(stream), f"size {f['size']} != {len(stream)}")
-        check(f["confidence_tier"] == "verified", f"tier not verified: {f.get('confidence_tier')}")
-        check(str(len(payload)) in f.get("label", ""), f"label missing size: {f.get('label')!r}")
 
-    # --- 2. extract byte-exact ----------------------------------------------
-    with tempfile.TemporaryDirectory() as out:
-        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tf:
-            tf.write(image)
-            path = tf.name
-        subprocess.run([MORIA, "-e", "-C", out, path], capture_output=True, timeout=120)
-        os.unlink(path)
-        d = os.path.join(out, f"0x{pad:x}-jzlzma-raw", "decompressed")
-        check(os.path.exists(d), f"no decompressed output at {d}")
-        if os.path.exists(d):
-            got = open(d, "rb").read()
-            check(got == payload, f"extract not byte-exact: {len(got)} vs {len(payload)}")
-
-    # --- 3. uImage with ih_comp = 3 wrapping a raw stream --------------------
+    # --- 1. uImage with ih_comp = 3 wrapping a raw stream -> fallback decode ---
     img = uimage_wrap(raw_stream(payload))
     with tempfile.TemporaryDirectory() as out:
         with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tf:
             tf.write(img)
             path = tf.name
-        r = subprocess.run([MORIA, "-e", "-C", out, path], capture_output=True, timeout=180)
+        subprocess.run([MORIA, "-e", "-C", out, path], capture_output=True, timeout=180)
         os.unlink(path)
         manifest_path = os.path.join(out, "manifest.json")
         check(os.path.exists(manifest_path), "uImage: no manifest produced")
         if os.path.exists(manifest_path):
             m = open(manifest_path).read()
             check("jzlzma (not LZMA)" in m, "uImage fallback warning not emitted")
-        # the decompressed payload must exist somewhere under the uimage dir
-        # (uimage extractor writes ./payload for the decoded image)
         hit = False
         for root, _, files in os.walk(out):
             for name in ("payload", "decompressed"):
-                if name in files:
-                    p = os.path.join(root, name)
-                    if open(p, "rb").read() == payload:
-                        hit = True
+                if name in files and open(os.path.join(root, name), "rb").read() == payload:
+                    hit = True
         check(hit, "uImage jzlzma fallback did not decode the payload")
 
-    # --- 4. false-positive guards -------------------------------------------
-    rng = __import__("random").Random(777)
-    junk = bytes(rng.randrange(256) for _ in range(2048))
-    check(not raw_findings(struct.pack("<II", 0x10000, 4096) + junk),
-          "FP: random payload accepted")
-    real = raw_stream(b"short but real. " * 8)
-    tampered = bytearray(real)
-    struct.pack_into("<I", tampered, 4, struct.unpack_from("<I", real, 4)[0] + 1)
-    check(not raw_findings(bytes(tampered)), "FP: unreachable declared size accepted")
-    check(not raw_findings(real[:16]), "FP: stream past EOF accepted")
-    z = bytearray(real)
-    struct.pack_into("<I", z, 4, 0)
-    check(not raw_findings(bytes(z)), "FP: uncomp_size 0 accepted")
+    # --- 2. FP regression: no standalone jzlzma-raw scanner -------------------
+    # The exact shape that false-positived before the scanner was removed: a
+    # plausible dict/size header (dict=64 KiB, uncomp=8192) in front of a run of
+    # zeros. The old trial-decode "succeeded" (8192 literal zeros) and reported
+    # a verified jzlzma-raw finding; moria must now find nothing jzlzma here.
+    zero_fp = struct.pack("<II", 0x10000, 8192) + b"\x00" * 9300
+    check(not any(t and t.startswith("jzlzma") for t in all_types(zero_fp)),
+          "FP: zero-padded buffer with a dict/size header reported as jzlzma")
 
-    # Wrapped form must be owned by "jzlzma", not double-reported as raw.
+    # A real raw stream embedded at an offset is intentionally NOT identified on
+    # its own any more (it is reached via its container, e.g. the uImage above).
+    embedded = b"\xff" * 0x400 + raw_stream(payload) + b"\x00" * 32
+    check("jzlzma-raw" not in all_types(embedded),
+          "jzlzma-raw type still emitted (standalone scanner should be gone)")
+
+    # High-entropy junk behind a header must also stay silent.
+    rng = __import__("random").Random(777)
+    junk = struct.pack("<II", 0x10000, 4096) + bytes(rng.randrange(256) for _ in range(6000))
+    check("jzlzma-raw" not in all_types(junk), "FP: random payload reported as jzlzma-raw")
+
+    # --- 3. wrapped form is still identified (real magic), never as raw -------
     wrapped = gen_samples.jzlzma_stream(b"wrapped payload. " * 200)
-    types = {x["type"] for x in moria_json(wrapped).get("findings", [])}
+    types = set(all_types(wrapped))
     check("jzlzma" in types, f"wrapped form not identified: {types}")
-    check("jzlzma-raw" not in types, f"wrapped form double-reported as raw: {types}")
+    check("jzlzma-raw" not in types, f"wrapped form reported as raw: {types}")
 
     if fails:
         for m in fails:

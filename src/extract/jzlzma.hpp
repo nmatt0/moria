@@ -21,6 +21,15 @@
 // (a reference Python decoder that instead ran to input exhaustion overran into
 // the final byte's padding bits).
 //
+// Two container forms occur. The wrapped form above is detected by the `jzlzma`
+// signature, anchored on the 0x27051956 magic. A bare stream led only by the
+// 8-byte dict+uncompressed_size pair (newer T40/T41 parts, e.g. Wyze Cam v4) is
+// magicless, checksumless and not entropy-coded, so it has no FP-safe standalone
+// identity: low-entropy data trivially "decodes" to any declared size. It is
+// therefore decoded only where a container points at it — a uImage whose
+// ih_comp = lzma payload fails a standard-LZMA decode (see extract/uimage.cpp) —
+// never by a standalone scan signature.
+//
 // Recovered from binwalk PR #957 and confirmed against two stock firmware
 // images (cpio rootfs payloads that end cleanly at the declared size).
 #pragma once

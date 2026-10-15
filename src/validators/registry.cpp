@@ -16,7 +16,6 @@
 #include "validators/littlefs.hpp"
 #include "validators/luks.hpp"
 #include "validators/jzlzma.hpp"
-#include "validators/jzlzma_raw.hpp"
 #include "validators/lzma.hpp"
 #include "validators/otra.hpp"
 #include "validators/partition.hpp"
@@ -81,7 +80,6 @@ Validator find_validator(const std::string& name) {
     if (name == "spiffs") return validate_spiffs;
     if (name == "lzma") return validate_lzma;
     if (name == "jzlzma") return validate_jzlzma;
-    if (name == "jzlzma_raw") return validate_jzlzma_raw;
     if (name == "otra") return validate_otra;
     return nullptr;
 }

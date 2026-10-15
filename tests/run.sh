@@ -28,7 +28,8 @@ python3 tests/test_partition_overlap.py
 python3 tests/test_entropy.py
 # ESP32 partition-table region map + NVS identify/extract (synthetic, self-contained).
 python3 tests/test_esp32_part.py
-# Ingenic jzlzma, RAW form (dict+size mini-header, e.g. uImage ih_comp=lzma payload).
+# Ingenic jzlzma RAW form: uImage ih_comp=lzma fallback decode + FP regression
+# (no standalone scanner for the magicless raw stream).
 python3 tests/test_jzlzma_raw.py
 python3 tests/test_esp32_nvs.py
 # Legacy block filesystems: NILFS2/Minix/ReiserFS/UFS/APFS/LogFS identify (+ real mkfs.minix).

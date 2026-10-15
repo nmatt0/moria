@@ -28,9 +28,4 @@ bool extract_compressed(const Reader& r, const Finding& f, SafeRoot& root, const
 bool extract_jzlzma(const Reader& r, const Finding& f, SafeRoot& root, const std::string& subdir,
                     Extracted& out);
 
-// Raw (unwrapped) jzlzma: [dict u32][uncomp u32][stream], e.g. the payload of a
-// uImage with ih_comp = lzma on Ingenic T40/T41.
-bool extract_jzlzma_raw(const Reader& r, const Finding& f, SafeRoot& root, const std::string& subdir,
-                        Extracted& out);
-
 }  // namespace ft
