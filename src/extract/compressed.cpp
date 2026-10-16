@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "extract/decompress.hpp"
+#include "extract/jzlzma.hpp"
 #include "extract/safepath.hpp"
 
 namespace ft {
@@ -61,6 +62,53 @@ bool extract_compressed(const Reader& r, const Finding& f, SafeRoot& root, const
         return true;
     }
     out.consumed = consumed;  // the true compressed span, so the driver can claim it
+    if (!root.make_dir(subdir)) {
+        out.status = "error:mkdir";
+        return true;
+    }
+    if (root.write_file(subdir + "/decompressed", *data, 0644)) {
+        out.files++;
+        out.bytes += data->size();
+        out.status = "ok";
+    } else {
+        out.status = "error:write";
+    }
+    return true;
+}
+
+bool extract_jzlzma(const Reader& r, const Finding& f, SafeRoot& root, const std::string& subdir,
+                    Extracted& out) {
+    out.offset = f.offset;
+    out.type = "jzlzma";
+    out.root = subdir;
+
+    // mark_rootfs_lzma header: [payload_size u32][magic u32][dict u32][usize u32]
+    auto payload_size = r.at<uint32_t>(f.offset, Endian::Little);
+    auto uncomp = r.at<uint32_t>(f.offset + 12, Endian::Little);
+    if (!payload_size || !uncomp || *uncomp > kJzlzmaMaxOut) {
+        out.status = "error:read";
+        return true;
+    }
+    const size_t stream_off = f.offset + 16;
+    if (stream_off >= r.size()) {
+        out.status = "error:read";
+        return true;
+    }
+    // Decode from the declared span; a stream shorter than the file (a dump
+    // padded past the payload) or clipped by EOF both decode the same.
+    const size_t stream_len =
+        std::min<size_t>(*payload_size, static_cast<size_t>(r.size() - stream_off));
+    auto src = r.bytes(stream_off, stream_len);
+    if (!src) {
+        out.status = "error:read";
+        return true;
+    }
+    auto data = jzlzma_decode(*src, *uncomp);
+    if (!data || data->empty()) {
+        out.status = "error:decompress";
+        return true;
+    }
+    out.consumed = 16 + stream_len;
     if (!root.make_dir(subdir)) {
         out.status = "error:mkdir";
         return true;

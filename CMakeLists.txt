@@ -80,6 +80,7 @@ add_executable(moria
   src/extract/lzx.cpp
   src/wince_rom_parse.cpp
   src/extract/lzari.cpp
+  src/extract/jzlzma.cpp
   src/extract/vbf.cpp
   src/extract/vbmeta.cpp
   src/extract/lzss.cpp
@@ -148,6 +149,7 @@ add_executable(moria
   src/extract/spiffs.cpp
   src/extract/littlefs.cpp
   src/validators/luks.cpp
+  src/validators/jzlzma.cpp
   src/validators/lzma.cpp
 )
 target_include_directories(moria PRIVATE src third_party)
@@ -219,6 +221,7 @@ add_executable(moria_unit
   src/ahocorasick.cpp
   src/extract/lzo1x.cpp
   src/extract/lzari.cpp
+  src/extract/jzlzma.cpp
   src/extract/ucl.cpp
   src/extract/upx_filter.cpp
   src/deobfuscate/cipher.cpp
@@ -250,6 +253,7 @@ if(Python3_Interpreter_FOUND)
     test_legacy_fs
     test_luks
     test_lzma
+    test_jzlzma
     test_rae_rfp
     test_otra
     test_wince_rom

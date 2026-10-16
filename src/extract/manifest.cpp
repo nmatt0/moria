@@ -81,6 +81,7 @@ Extractor find_extractor(const std::string& type) {
     if (type == "gzip" || type == "xz" || type == "zstd" || type == "lz4" || type == "lz4_legacy" ||
         type == "lzma")
         return extract_compressed;
+    if (type == "jzlzma") return extract_jzlzma;
     if (type == "yaffs2") return extract_yaffs2;
     if (type == "ubifs" || type == "ubi") return extract_ubifs;
     if (type == "hfsplus" || type == "hfsx") return extract_hfsplus;

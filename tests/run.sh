@@ -28,6 +28,9 @@ python3 tests/test_partition_overlap.py
 python3 tests/test_entropy.py
 # ESP32 partition-table region map + NVS identify/extract (synthetic, self-contained).
 python3 tests/test_esp32_part.py
+# Ingenic jzlzma RAW form: uImage ih_comp=lzma fallback decode + FP regression
+# (no standalone scanner for the magicless raw stream).
+python3 tests/test_jzlzma_raw.py
 python3 tests/test_esp32_nvs.py
 # Legacy block filesystems: NILFS2/Minix/ReiserFS/UFS/APFS/LogFS identify (+ real mkfs.minix).
 python3 tests/test_legacy_fs.py
@@ -35,6 +38,9 @@ python3 tests/test_legacy_fs.py
 python3 tests/test_luks.py
 # Legacy standalone .lzma identify (verified via trial-decode) + byte-exact extract + FP guards.
 python3 tests/test_lzma.py
+# Ingenic jzlzma (hardware LZ77) identify (verified via trial-decode) + byte-exact
+# extract + recursion + FP guards.
+python3 tests/test_jzlzma.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
 python3 tests/test_rae_rfp.py
 # Windows CE XIP ROM: ROMHDR resolution, module PE rebuild, CECompress decode.

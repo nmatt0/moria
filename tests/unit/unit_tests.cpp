@@ -14,6 +14,7 @@
 #include "crc32.hpp"
 #include "entropy.hpp"
 #include "expr.hpp"
+#include "extract/jzlzma.hpp"
 #include "extract/lzari.hpp"
 #include "extract/lzo1x.hpp"
 #include "extract/ucl.hpp"
@@ -336,6 +337,235 @@ static void test_lzari() {
     CHECK(z.has_value() && z->empty());
 }
 
+// ---- jzlzma -----------------------------------------------------------------
+// A test-only encoder mirroring extract/jzlzma.cpp, so round-trips exercise
+// every opcode: literals, new-distance matches (all three length bands, direct
+// / reversed / align position slots), the rep0 one-byte shortcut, explicit-
+// length rep0, and rep1/rep2/rep3 rotations.
+namespace {
+
+struct JzBits {
+    std::vector<uint8_t> b;
+    size_t n = 0;  // bits written so far
+    void bit(int v) {
+        if (n % 8 == 0) b.push_back(0);
+        if (v) b[n / 8] |= static_cast<uint8_t>(1 << (n % 8));
+        ++n;
+    }
+    void num(uint32_t v, uint32_t bits) {  // MSB-first, as the decoder reads
+        for (uint32_t i = bits; i-- > 0;) bit((v >> i) & 1);
+    }
+};
+
+uint32_t jz_rev(uint32_t v, uint32_t bits) {
+    uint32_t r = 0;
+    for (uint32_t i = 0; i < bits; ++i) r = (r << 1) | ((v >> i) & 1);
+    return r;
+}
+
+void jz_len(JzBits& w, size_t len) {  // 2..273
+    if (len <= 9) {
+        w.bit(0);
+        w.num(static_cast<uint32_t>(len - 2), 3);
+    } else if (len <= 17) {
+        w.bit(1);
+        w.bit(0);
+        w.num(static_cast<uint32_t>(len - 10), 3);
+    } else {
+        w.bit(1);
+        w.bit(1);
+        w.num(static_cast<uint32_t>(len - 18), 8);
+    }
+}
+
+void jz_dist(JzBits& w, uint32_t pos) {  // distance minus one
+    if (pos < 4) {
+        w.num(pos, 6);
+        return;
+    }
+    for (uint32_t slot = 4; slot < 64; ++slot) {
+        const uint32_t nb = (slot >> 1) - 1;
+        const uint32_t base = (2 | (slot & 1)) << nb;
+        if (pos >= base + (1u << nb)) continue;
+        w.num(slot, 6);
+        const uint32_t extra = pos - base;
+        if (slot < 14) {
+            w.num(jz_rev(extra, nb), nb);
+        } else {
+            w.num(extra >> 4, nb - 4);
+            w.num(jz_rev(extra & 0xF, 4), 4);
+        }
+        return;
+    }
+}
+
+std::vector<uint8_t> jzlzma_encode(const std::vector<uint8_t>& in) {
+    JzBits w;
+    uint32_t reps[4] = {0, 0, 0, 0};
+    constexpr size_t kMaxLen = 273;
+    auto match_len = [&](size_t i, size_t d) -> size_t {
+        size_t l = 0;
+        while (l < kMaxLen && i + l < in.size() && in[i + l] == in[i + l - d]) ++l;
+        return l;
+    };
+    size_t i = 0;
+    while (i < in.size()) {
+        // Best rep candidate: rep0 accepts length >= 1 (the one-byte shortcut),
+        // rep1..3 need >= 2 (explicit length).
+        int best_rep = -1;
+        size_t best_len = 0;
+        for (int r = 0; r < 4; ++r) {
+            const size_t d = static_cast<size_t>(reps[r]) + 1;
+            if (d > i) continue;
+            const size_t l = match_len(i, d);
+            const size_t need = (r == 0) ? 1 : 2;
+            if (l >= need && l > best_len) {
+                best_len = l;
+                best_rep = r;
+            }
+        }
+        // Best new-distance candidate (smallest distance wins ties).
+        size_t new_len = 0, new_d = 0;
+        for (size_t d = 1; d <= i; ++d) {
+            const size_t l = match_len(i, d);
+            if (l >= 2 && l > new_len) {
+                new_len = l;
+                new_d = d;
+            }
+        }
+        // Deliberate mix: take the rep on even positions, the new distance on
+        // odd ones, whenever both are viable — so both encodings get exercised.
+        const bool rep_first = (i % 2) == 0;
+        if (new_len >= 2 && (new_len > best_len || (rep_first && new_len == best_len))) {
+            w.bit(1);
+            w.bit(0);
+            jz_len(w, new_len);
+            jz_dist(w, static_cast<uint32_t>(new_d - 1));
+            reps[3] = reps[2];
+            reps[2] = reps[1];
+            reps[1] = reps[0];
+            reps[0] = static_cast<uint32_t>(new_d - 1);
+            i += new_len;
+        } else if (best_rep >= 0 && best_len >= 1) {
+            w.bit(1);
+            w.bit(1);
+            if (best_rep == 0) {
+                w.bit(0);
+                if (best_len == 1) {
+                    w.bit(0);  // one-byte rep0 shortcut
+                } else {
+                    w.bit(1);  // explicit length below
+                }
+            } else {
+                w.bit(1);
+                if (best_rep == 1) {
+                    w.bit(0);
+                } else {
+                    w.bit(1);
+                    w.bit(best_rep == 2 ? 0 : 1);
+                }
+                const uint32_t v = reps[best_rep];
+                for (int k = best_rep; k > 0; --k) reps[k] = reps[k - 1];
+                reps[0] = v;
+            }
+            if (best_len > 1 || best_rep != 0) jz_len(w, best_len);
+            i += best_len;
+        } else {
+            w.bit(0);
+            w.num(in[i], 8);
+            ++i;
+        }
+    }
+    return w.b;
+}
+
+}  // namespace
+
+static void test_jzlzma() {
+    struct Case {
+        const char* name;
+        std::vector<uint8_t> data;
+    };
+    std::vector<Case> cases;
+    {
+        std::vector<uint8_t> v;
+        for (int i = 0; i < 512; ++i) v.push_back(static_cast<uint8_t>((i * 7 + 3) & 0xFF));
+        cases.push_back({"pseudo-random (literals)", v});
+    }
+    {
+        const std::string s = "MORIA jzlzma round trip. The quick brown fox. ";
+        std::vector<uint8_t> v(s.begin(), s.end());
+        for (int i = 0; i < 12; ++i) v.insert(v.end(), s.begin(), s.end());
+        cases.push_back({"repetitive text (mid-range distances)", v});
+    }
+    cases.push_back({"zeros (overlapping rep0 copies)", std::vector<uint8_t>(4096, 0)});
+    {
+        // period-40 repeats put distances in the reversed-extra slot range (4..63)
+        std::vector<uint8_t> p, v;
+        for (int i = 0; i < 40; ++i) p.push_back(static_cast<uint8_t>(i));
+        for (int i = 0; i < 6; ++i) v.insert(v.end(), p.begin(), p.end());
+        cases.push_back({"period-40 pattern (reversed extra bits)", v});
+    }
+    {
+        // a repeat at distance 5000 lands in the align (slot >= 14) range
+        std::vector<uint8_t> v;
+        for (int i = 0; i < 5000; ++i) v.push_back(static_cast<uint8_t>((i * 31) & 0xFF));
+        for (int i = 0; i < 128; ++i) v.push_back(v[i]);
+        cases.push_back({"far repeat (align slots)", v});
+    }
+    {
+        std::vector<uint8_t> v;
+        for (int i = 0; i < 256; ++i)
+            for (int j = 0; j < 4; ++j) v.push_back(static_cast<uint8_t>(i));
+        cases.push_back({"256-byte cycle", v});
+    }
+    cases.push_back({"tiny", {'a', 'b', 'c'}});
+
+    for (const auto& c : cases) {
+        std::vector<uint8_t> enc = jzlzma_encode(c.data);
+        auto dec = ft::jzlzma_decode(enc, c.data.size());
+        CHECK(dec.has_value());
+        if (dec) CHECK(*dec == c.data);  // one line per failure keeps output readable
+    }
+
+    // The long-band length (18..273) and the rep rotations get hit by the
+    // fixtures above; assert the zeros case actually used a long copy.
+    {
+        std::vector<uint8_t> zeros(600, 0);
+        auto dec = ft::jzlzma_decode(jzlzma_encode(zeros), zeros.size());
+        CHECK(dec.has_value() && *dec == zeros);
+    }
+
+    // --- corruption / guards ---
+    std::vector<uint8_t> enc = jzlzma_encode(cases[1].data);
+    CHECK(jzlzma_encode({}).empty());  // empty input -> empty stream
+    CHECK(ft::jzlzma_decode({}, 0).has_value());                       // nothing to do
+    CHECK(ft::jzlzma_decode({}, 0)->empty());
+    CHECK(!ft::jzlzma_decode({}, 10).has_value());                     // input exhausted
+    CHECK(!ft::jzlzma_decode(enc, cases[1].data.size() + 1).has_value());  // size beyond stream
+    CHECK(!ft::jzlzma_decode(std::span<const uint8_t>(enc.data(), enc.size() / 2),
+                             cases[1].data.size())
+               .has_value());                                          // truncated stream
+    CHECK(!ft::jzlzma_decode(enc, size_t(ft::kJzlzmaMaxOut) + 1).has_value());  // over the cap
+    // A match before any output: first op = new-distance -> distance reaches
+    // before the start. Bits: 1 (match) 0 (new dist) <len> <dist>.
+    {
+        JzBits w;
+        w.bit(1);
+        w.bit(0);
+        jz_len(w, 2);
+        jz_dist(w, 3);
+        CHECK(!ft::jzlzma_decode(w.b, 8).has_value());
+    }
+    // A declared size satisfiable only by reading padding bits as ops is still
+    // a valid decode target only if the bits hold; random garbage is rejected.
+    {
+        std::vector<uint8_t> garbage(64);
+        for (size_t i = 0; i < garbage.size(); ++i) garbage[i] = static_cast<uint8_t>(i * 37);
+        CHECK(!ft::jzlzma_decode(garbage, 1000).has_value());
+    }
+}
+
 static void test_mime() {
     // Registered types verbatim; firmware types get a specific x- form (not
     // the useless application/octet-stream that `file` returns); `file`'s own
@@ -614,6 +844,7 @@ int main() {
     test_entropy();
     test_lzo1x();
     test_lzari();
+    test_jzlzma();
     test_ucl();
     test_upx_filter();
     test_mime();
