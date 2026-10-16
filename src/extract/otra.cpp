@@ -52,7 +52,7 @@ bool extract_otra(const Reader& r, const Finding& f, SafeRoot& root, const std::
         return true;
     }
 
-    auto tables = otra::parse_otra_tables(r, f.offset, h);
+    auto tables = otra::parse_otra_tables(r, h);
 
     // Flat subtype: no populated tables — the body is a raw flash image. Write it
     // whole so downstream carving / recursion can work on it.

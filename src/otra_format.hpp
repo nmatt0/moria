@@ -113,7 +113,7 @@ inline std::optional<Header> parse_otra(const Reader& r, size_t base) {
 
 // Walk the partition + segment tables and classify the subtype. Never throws;
 // on a flat/opaque image it returns Tables{segmented=false} with empty vectors.
-inline Tables parse_otra_tables(const Reader& r, size_t base, const Header& h) {
+inline Tables parse_otra_tables(const Reader& r, const Header& h) {
     Tables t;
     if (h.npart == 0 || h.npart > kMaxParts || h.nseg == 0 || h.nseg > kMaxSegs) return t;
     if (h.pay_off > r.size()) return t;
