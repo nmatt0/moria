@@ -54,6 +54,18 @@ bool validate_uimage(ValidatorCtx& ctx) {
     auto hdr = r.bytes(off, 64);
     if (!hdr) return false;
 
+    // The uImage header is always big-endian, but the *payload* endianness is
+    // not recorded anywhere in the format: ih_arch names the target CPU family
+    // only. Finding::endian (surfaced as "big" in human/JSON output) reflects
+    // the header -- and hence this signature's magic -- so annotate the finding
+    // to keep readers from inferring a payload byte order from "big/mips"
+    // (Ingenic/mipsel images hit exactly that misreading).
+    ctx.out.diagnostics.push_back({
+        "info", "uimage-payload-endian-unknown",
+        "endian describes the 64-byte header (and this signature's magic); "
+        "the uImage format does not record the payload's byte order -- verify "
+        "separately for the ih_arch target"});
+
     // Recompute header CRC with the hcrc field (bytes 4..8) zeroed.
     std::array<uint8_t, 64> tmp{};
     std::memcpy(tmp.data(), hdr->data(), 64);

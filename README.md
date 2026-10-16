@@ -60,7 +60,7 @@ Unpacked in-process, no external tools and no sudo:
 - `signatures-firmware/` holds vendor firmware-container magics and loads by default.
 - `signatures-generated/` holds ~2.5k general file-type magics derived from `file(1)`'s magic database and loads only with `--broad`.
 
-To add a format, drop a `.toml` in `signatures/`. A small C++ validator is only needed for checks the declarative layer can't express, such as CRCs or cross-block pointers.
+To add a format, drop a `.toml` in `signatures/`. A small C++ validator is only needed for checks the declarative layer can't express, such as CRCs or cross-block pointers. Field semantics (magic_offset, magic endianness, short signatures, soft constraints, the validator contract) are documented in [SIGAUTHORING.md](SIGAUTHORING.md).
 
 ## Scope
 
