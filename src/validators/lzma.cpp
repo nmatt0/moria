@@ -15,7 +15,7 @@ constexpr uint64_t kUnknownSize = UINT64_MAX;  // all-0xFF = size not stored
 // props = (pb * 5 + lp) * 9 + lc, with lc<=8, lp<=4, pb<=4 → max 224.
 constexpr uint8_t kMaxProps = 224;
 // Dictionary bounds. Real firmware uses 8/16/32/64 MiB; the format allows less.
-// A multiple of 64 KiB (the `5D 00 00` anchor guarantees the low 16 bits are 0),
+// A multiple of 64 KiB (the `xx 00 00` anchors guarantee the low 16 bits are 0),
 // required to be a power of two in [4 KiB, 768 MiB].
 constexpr uint32_t kMinDict = 1u << 12;
 constexpr uint32_t kMaxDict = 768u << 20;
@@ -43,7 +43,8 @@ bool validate_lzma(ValidatorCtx& ctx) {
     if (known && (*usize == 0 || *usize > kProbeCap)) return false;  // implausible declared size
 
     // FP-proof gate: trial-decode to a clean end-of-stream marker. A stray
-    // `5D 00 00 ...` cannot reach the marker, so it is rejected here.
+    // anchor match (`5D 00 00 ...`, `6D 00 00 ...`) cannot reach the marker, so
+    // it is rejected here.
     auto src = r.bytes(off, r.size() - off);
     if (!src) return false;
     size_t consumed = 0;

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Legacy standalone LZMA (".lzma alone") identify + extract regression (issue #43).
+"""Legacy standalone LZMA (".lzma alone") identify + extract regression (issues #43, #45).
 
 moria must recognize a legacy LZMA1 "alone" stream (no magic number: a 13-byte
 [props][dict_size][uncompressed_size] header, then a raw LZMA1 stream) and, under
--e, decompress it byte-exact. The format is anchored on the near-universal
-firmware header prefix `5D 00 00` and confirmed by a trial-decode to a clean
-end-of-stream marker, so the false-positive guards below are the point of the
-whole exercise.
+-e, decompress it byte-exact. The format is anchored on the header prefixes
+firmware ships (`5D 00 00`, the toolchain default, and `6D 00 00`, OpenWrt's
+lc1/lp2/pb2 kernels) and confirmed by a trial-decode to a clean end-of-stream
+marker, so the false-positive guards below are the point of the whole exercise.
 
 Real streams here come from Python's stdlib lzma module (FORMAT_ALONE), so the
 "real stream" cases need no external tool.
@@ -17,6 +17,8 @@ Layers:
   3. Known-size header: correct declared size passes; wrong declared size rejected.
   4. FP guards: valid header + random payload rejected; a truncated stream (no end
      marker) rejected; a sub-threshold dict rejected.
+  5. Non-default props: an OpenWrt-style props 0x6D stream embedded at 0x200 is
+     identified and extracted byte-exact (#45).
 
 Run: python3 tests/test_lzma.py
 """
@@ -118,6 +120,28 @@ def main():
     baddict[1] = 0x00
     baddict[2] = 0x00
     check(not lzma_findings(bytes(baddict)), "FP: sub-threshold dict size was accepted")
+
+    # --- 5. OpenWrt props 0x6D (lc1/lp2/pb2), not at offset 0 (#45) ---------
+    owrt = lzma.compress(payload, format=lzma.FORMAT_ALONE, filters=[{
+        "id": lzma.FILTER_LZMA1, "lc": 1, "lp": 2, "pb": 2, "dict_size": 8 << 20}])
+    check(owrt[:3] == b"\x6d\x00\x00", "props 0x6D fixture header not 6d 00 00")
+    image = b"\x00" * 0x200 + owrt + b"\xff" * 64
+    g6 = lzma_findings(image)
+    check(len(g6) == 1, f"props 0x6D: expected one lzma finding, got {len(g6)}")
+    if g6:
+        check(g6[0]["offset"] == 0x200, f"props 0x6D: offset {g6[0]['offset']:#x}, want 0x200")
+        check(g6[0]["confidence_tier"] == "verified",
+              f"props 0x6D: tier not verified: {g6[0]['confidence_tier']}")
+    with tempfile.TemporaryDirectory() as t:
+        img = os.path.join(t, "owrt.bin")
+        with open(img, "wb") as f:
+            f.write(image)
+        subprocess.run([MORIA, "-e", img], capture_output=True, timeout=120)
+        dec = os.path.join(img + ".extracted", "0x200-lzma", "decompressed")
+        check(os.path.exists(dec), "props 0x6D extract: decompressed file missing")
+        if os.path.exists(dec):
+            with open(dec, "rb") as f:
+                check(f.read() == payload, "props 0x6D extract: not byte-exact")
 
     print("-" * 60)
     if fails:
