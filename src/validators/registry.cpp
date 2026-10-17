@@ -8,6 +8,7 @@
 #include "validators/dtb.hpp"
 #include "validators/elf.hpp"
 #include "validators/esp32_part.hpp"
+#include "validators/gif.hpp"
 #include "validators/esp32_nvs.hpp"
 #include "validators/ihex.hpp"
 #include "validators/jffs2.hpp"
@@ -19,6 +20,7 @@
 #include "validators/lzma.hpp"
 #include "validators/otra.hpp"
 #include "validators/partition.hpp"
+#include "validators/png.hpp"
 #include "validators/rae_rfp.hpp"
 #include "validators/spiffs.hpp"
 #include "validators/squashfs.hpp"
@@ -54,6 +56,8 @@ Validator find_validator(const std::string& name) {
     if (name == "tar") return validate_tar;
     if (name == "zip") return validate_zip;
     if (name == "jpeg") return validate_jpeg;
+    if (name == "png") return validate_png;
+    if (name == "gif") return validate_gif;
     if (name == "rae_rfp") return validate_rae_rfp;
     if (name == "wince_rom") return validate_wince_rom;
     if (name == "wince_hive") return validate_wince_hive;

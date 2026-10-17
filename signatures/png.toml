@@ -5,6 +5,12 @@ category = "image"
 # folded into one 16-byte magic -> effectively self-validating.
 confidence = "consistent"
 
+# The magic identifies the image but cannot bound it. The validator walks the
+# chunk list to IEND to set the true size (otherwise the finding runs to the next
+# finding or EOF, swallowing unrelated trailing bytes; see issue #58) and checks
+# each chunk's CRC-32, upgrading the tier to `verified` when they all pass.
+validator = "png"
+
 [[magic]]
 hex = "89504e470d0a1a0a0000000d49484452"
 endian = "big"

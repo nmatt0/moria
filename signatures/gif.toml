@@ -2,6 +2,14 @@ name = "gif"
 category = "image"
 confidence = "structural"
 
+# The 6-byte magic alone cannot bound the image (a GIF has no length field) and is
+# weak enough to match stray bytes in binary data. The validator walks the block
+# stream to the 0x3B trailer to set the true size (otherwise the finding runs to
+# the next finding or EOF, swallowing unrelated trailing bytes; see issue #58) and
+# rejects false positives whose first block after the header + color table is not a
+# valid introducer. A clean walk upgrades the tier to `consistent`.
+validator = "gif"
+
 [[magic]]
 ascii = "GIF87a"
 endian = "little"
