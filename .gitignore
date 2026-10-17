@@ -2,6 +2,7 @@ build*/
 fuzz_scan
 fuzz_esp32_part
 fuzz_esp32_nvs
+fuzz_lzx
 *.dSYM/
 fuzz/corpus/
 crash-*
