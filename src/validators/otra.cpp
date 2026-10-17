@@ -42,7 +42,7 @@ bool validate_otra(ValidatorCtx& ctx) {
     ctx.out.size = r.size() - base;
     if (!h.version.empty()) ctx.out.version = h.version;
 
-    auto tables = otra::parse_otra_tables(r, base, h);
+    auto tables = otra::parse_otra_tables(r, h);
     ctx.out.compression = tables.segmented ? "lzo1x" : "none";
 
     if (tables.segmented) {
