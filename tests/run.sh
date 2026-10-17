@@ -43,6 +43,8 @@ python3 tests/test_lzma.py
 python3 tests/test_jzlzma.py
 # GIF/PNG sized to their real terminator (0x3B / IEND), not to EOF (issue #58).
 python3 tests/test_image_size.py
+# sxverity container (SpaceX dm-verity wrapper) identify + payload + FP guards (#55).
+python3 tests/test_sxverity.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
 python3 tests/test_rae_rfp.py
 # Windows CE XIP ROM: ROMHDR resolution, module PE rebuild, CECompress decode.

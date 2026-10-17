@@ -1,0 +1,26 @@
+name = "sxverity"
+category = "container"
+
+# SpaceX "sxverity" container: a 4 KiB preamble of four 1024-byte records (the
+# magic "sxverity" starts each record, at 0x000 / 0x400 / 0x800 / 0xC00), each
+# carrying a dm-verity root hash, an embedded public key, and an ed25519 signature
+# over the preceding fields; in the images observed the four records are
+# byte-identical. The protected payload (a big-endian romfs) follows at 0x1000.
+# It wraps the Linux dm-verity feature on Starlink User Terminal firmware
+# (persistent partitions, the sx runtime partition, version_info, update bundles).
+# The validator confirms the four records and the romfs payload, so the 8-byte
+# ASCII magic reaches the consistent tier. Identify only: the finding owns the
+# 4 KiB record table and the romfs payload surfaces as its own finding at 0x1000.
+validator = "sxverity"
+confidence = "consistent"
+
+[[magic]]
+ascii = "sxverity"
+endian = "little"
+
+[doc]
+description = "sxverity container (SpaceX dm-verity wrapper): a 4 KiB signed record table over a romfs payload, used on Starlink User Terminal firmware."
+references = [
+  { title = "Diving into Starlink's User Terminal Firmware (Quarkslab)", url = "https://blog.quarkslab.com/starlink.html" },
+  { title = "dm-verity (kernel docs)", url = "https://www.kernel.org/doc/html/latest/admin-guide/device-mapper/verity.html" },
+]

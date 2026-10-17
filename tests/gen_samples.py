@@ -181,6 +181,19 @@ def romfs():
     return bytes(b)
 
 
+def sxverity():
+    # SpaceX sxverity container: four 1024-byte records each starting with the
+    # "sxverity" magic (a size field at +0x0c and pseudo hash/key/sig bytes so the
+    # record is not all-zero), then the romfs payload at 0x1000. The validator
+    # requires all four records + the romfs payload. See issue #55.
+    rec = bytearray(1024)
+    rec[0:8] = b"sxverity"
+    struct.pack_into("<I", rec, 0x0c, 0x800)         # config/size field
+    struct.pack_into("<III", rec, 0x14, 2, 3, 3)     # version / block-count fields
+    rec[0x20:0x40] = bytes(range(0x20, 0x40))        # stand-in root hash / key / sig
+    return bytes(rec) * 4 + romfs()
+
+
 _CRC_T = []
 for _i in range(256):
     _c = _i
@@ -1377,6 +1390,7 @@ MANIFEST = [
     ("fat32.bin", fat32, "fat32", CONSISTENT),
     ("cramfs.bin", cramfs, "cramfs", CONSISTENT),
     ("romfs.bin", romfs, "romfs", CONSISTENT),
+    ("image.sxv", sxverity, "sxverity", CONSISTENT),
     ("jffs2.bin", jffs2, "jffs2", VERIFIED),
     ("ubi.bin", ubi, "ubi", VERIFIED),
     ("ubifs.bin", ubifs, "ubifs", VERIFIED),
