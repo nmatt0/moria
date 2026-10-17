@@ -15,6 +15,7 @@
 #include "extract/ext.hpp"
 #include "extract/exfat.hpp"
 #include "extract/hfsplus.hpp"
+#include "extract/reiserfs.hpp"
 #include "extract/xfs.hpp"
 #include "extract/btrfs.hpp"
 
@@ -56,6 +57,7 @@ Extractor find_extractor(const std::string& type) {
     if (type == "tar") return extract_tar;
     if (type == "romfs") return extract_romfs;
     if (type == "cramfs") return extract_cramfs;
+    if (type == "reiserfs") return extract_reiserfs;
     if (type == "erofs") return extract_erofs;
     if (type == "f2fs") return extract_f2fs;
     if (type == "android_sparse") return extract_android_sparse;
