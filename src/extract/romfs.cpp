@@ -29,7 +29,12 @@ constexpr uint32_t TYPE_SYMLINK = 3;
 
 constexpr size_t MAX_ENTRIES = 2000000;
 constexpr size_t MAX_DEPTH = 128;
-constexpr uint64_t MAX_FILE_BYTES = uint64_t(8) << 30;
+// The romfs size field (header offset 8) is 32-bit, so a declared file size
+// cannot exceed ~4 GiB. The cap has to be representable within that range to do
+// anything; a larger value would make the guard dead code. 1 GiB is a generous
+// ceiling for a read-only romfs image (itself bounded to <4 GiB by the 32-bit
+// full_size field) and bounds a single allocation from a crafted size field.
+constexpr uint64_t MAX_FILE_BYTES = uint64_t(1) << 30;
 
 uint64_t align16(uint64_t x) { return (x + 15) & ~uint64_t(15); }
 
@@ -81,19 +86,22 @@ void walk_chain(Ctx& c, uint64_t hdr, const std::string& rel, size_t depth) {
                 if (c.root.make_dir(full)) c.out.dirs++;
                 walk_chain(c, c.base + *spec, child_rel, depth + 1);
             } else if (type == TYPE_REG) {
-                if (*size <= MAX_FILE_BYTES) {
-                    auto d = c.r.bytes(data_off, *size);
-                    if (d) {
-                        std::vector<uint8_t> data(d->begin(), d->end());
-                        if (c.root.write_file(full, data, 0644)) {
-                            c.out.files++;
-                            c.out.bytes += data.size();
-                        } else {
-                            c.out.warnings.push_back("write failed: " + child_rel);
-                        }
+                // Clamp an oversized declared size to the cap and flag the
+                // result partial, matching the other extractors, rather than
+                // trusting the field and attempting one huge allocation.
+                uint64_t fsize = *size;
+                if (fsize > MAX_FILE_BYTES) { fsize = MAX_FILE_BYTES; c.truncated = true; }
+                auto d = c.r.bytes(data_off, fsize);
+                if (d) {
+                    std::vector<uint8_t> data(d->begin(), d->end());
+                    if (c.root.write_file(full, data, 0644)) {
+                        c.out.files++;
+                        c.out.bytes += data.size();
                     } else {
-                        c.truncated = true;
+                        c.out.warnings.push_back("write failed: " + child_rel);
                     }
+                } else {
+                    c.truncated = true;
                 }
             } else if (type == TYPE_SYMLINK) {
                 auto d = c.r.bytes(data_off, *size);
