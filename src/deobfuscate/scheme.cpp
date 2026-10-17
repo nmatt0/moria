@@ -416,6 +416,64 @@ std::optional<DescrambleResult> engenius(const Reader& r, size_t off, bool probe
     return res;
 }
 
+// ---- D-Link OTA container: a plain [build][count][entry x count] wrapper around
+// one or more Realtek Ameba firmware images, each single-byte-XOR obfuscated. Each
+// 24-byte entry is {"OTAn", u32 0x18, u32 cksum, u32 size, u32 payload_off, u32
+// flags}; payloads tile forward and the last ends at EOF. The XOR key is derived
+// from the known Ameba image magic "81958711" and verified, so a sibling device
+// that uses a different key still decrypts (or is reported undecryptable rather
+// than emitting garbage). Observed on D-Link DSP-W118 (RTL8711B). ----
+std::optional<DescrambleResult> dlink_ota(const Reader& r, size_t off, bool probe_only) {
+    static constexpr uint8_t kAmeba[8] = {'8', '1', '9', '5', '8', '7', '1', '1'};
+    auto count = r.at<uint32_t>(off + 4, Endian::Little);
+    if (!count || *count < 1 || *count > 9) return std::nullopt;
+    if (!starts_with(r, off + 8, reinterpret_cast<const uint8_t*>("OTA1"), 4)) return std::nullopt;
+    const size_t hdr_end = 8 + static_cast<size_t>(*count) * 24;
+    size_t expect = hdr_end;
+    uint32_t ota1_off = 0, ota1_size = 0;
+    for (uint32_t i = 0; i < *count; ++i) {
+        const size_t e = off + 8 + static_cast<size_t>(i) * 24;
+        if (!starts_with(r, e, reinterpret_cast<const uint8_t*>("OTA"), 3)) return std::nullopt;
+        auto stride = r.at<uint32_t>(e + 4, Endian::Little);
+        auto size = r.at<uint32_t>(e + 12, Endian::Little);
+        auto poff = r.at<uint32_t>(e + 16, Endian::Little);
+        if (!stride || *stride != 0x18 || !size || !poff || *poff != expect) return std::nullopt;
+        if (i == 0) {
+            ota1_off = *poff;
+            ota1_size = *size;
+        }
+        expect = static_cast<size_t>(*poff) + *size;
+    }
+    const size_t total_span = expect;
+    if (!ota1_size || off + total_span > r.size()) return std::nullopt;
+
+    // Derive the one-byte XOR key from the first Ameba magic byte ('8'), verify the
+    // full 8-byte magic. Keyless + self-validating.
+    const size_t p0 = off + ota1_off;
+    auto hdr = r.bytes(p0, 8);
+    if (!hdr) return std::nullopt;
+    const uint8_t key = static_cast<uint8_t>((*hdr)[0] ^ kAmeba[0]);
+    for (size_t i = 0; i < 8; ++i)
+        if (static_cast<uint8_t>((*hdr)[i] ^ key) != kAmeba[i]) return std::nullopt;
+
+    DescrambleResult res;
+    res.scheme = "dlink_ota";
+    res.cipher = "xor-1";
+    res.key_desc = "derived 0x" + to_hex(std::span<const uint8_t>(&key, 1));
+    res.validated = "realtek_ameba";
+    res.src_offset = p0;
+    res.src_len = ota1_size;
+    res.total_span = total_span;
+    if (!probe_only) {
+        auto ct = r.bytes(p0, ota1_size);
+        if (!ct) return std::nullopt;
+        std::vector<uint8_t> out(ota1_size);
+        for (size_t i = 0; i < ota1_size; ++i) out[i] = static_cast<uint8_t>((*ct)[i] ^ key);
+        res.data = std::move(out);
+    }
+    return res;
+}
+
 // Cheap header-structure check (no crypto): does a scheme's header actually parse
 // at `offset`? A bare magic match with no valid surrounding structure is a false
 // positive (esp. DLK's 3-byte magic, which hits ~once per 16 MB of random data) —
@@ -483,6 +541,30 @@ std::optional<StructMatch> scheme_structure(const Reader& r, size_t off) {
         if (len && *len > 136 && ml && *ml <= 256) return StructMatch{"engenius", *len};
         return std::nullopt;
     }
+    // D-Link OTA: count + "OTA1" at +8 + 24-byte entries that tile forward to EOF.
+    // (The dlink_ota scheme fn above handles the keyed case; this reports a variant
+    // whose payload does not XOR to the known Ameba magic as present-but-unkeyable.)
+    if (starts_with(r, off + 8, reinterpret_cast<const uint8_t*>("OTA1"), 4)) {
+        auto count = u32le(off + 4);
+        if (count && *count >= 1 && *count <= 9) {
+            size_t expect = 8 + static_cast<size_t>(*count) * 24;
+            bool ok = true;
+            for (uint32_t i = 0; i < *count; ++i) {
+                const size_t e = off + 8 + static_cast<size_t>(i) * 24;
+                auto stride = u32le(e + 4);
+                auto size = u32le(e + 12);
+                auto poff = u32le(e + 16);
+                if (!starts_with(r, e, reinterpret_cast<const uint8_t*>("OTA"), 3) || !stride ||
+                    *stride != 0x18 || !size || !poff || *poff != expect) {
+                    ok = false;
+                    break;
+                }
+                expect = static_cast<size_t>(*poff) + *size;
+            }
+            if (ok && off + expect <= r.size()) return StructMatch{"dlink_ota", expect};
+        }
+        return std::nullopt;
+    }
     return std::nullopt;
 }
 
@@ -490,7 +572,7 @@ struct Entry {
     const char* name;
     SchemeFn fn;
 };
-constexpr std::array<Entry, 7> kSchemes = {{
+constexpr std::array<Entry, 8> kSchemes = {{
     {"dlink_shrs", shrs},
     {"dlink_encrpted_img", encrpted_img},
     {"openssl_salted", openssl_salted},
@@ -498,6 +580,7 @@ constexpr std::array<Entry, 7> kSchemes = {{
     {"dlink_dlk", dlk},
     {"dlink_tlv", tlv},
     {"engenius", engenius},
+    {"dlink_ota", dlink_ota},
 }};
 
 }  // namespace

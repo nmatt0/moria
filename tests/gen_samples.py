@@ -807,6 +807,19 @@ def engenius():
     return bytes(out)
 
 
+def dlink_ota():
+    # D-Link OTA container: [u32 build][u32 count][count x 24-byte entries], each
+    # payload a Realtek Ameba image ("81958711" magic) single-byte-XOR obfuscated.
+    # moria derives the one-byte key from the magic and verifies it, so this
+    # identifies dlink_ota at verified tier. Payloads tile forward to EOF.
+    pt = b"81958711" + bytes(24) + b"AMEBA" + bytes(475)   # 512-byte Ameba payload
+    obf = bytes(b ^ 0xAB for b in pt)
+    count = 1
+    hdr_end = 8 + count * 24
+    entry = b"OTA1" + struct.pack("<IIIII", 0x18, 0, len(obf), hdr_end, 0)
+    return struct.pack("<II", 0x30190412, count) + entry + obf
+
+
 def android_magic_at_zero():
     # Regression for the signature dedup: an "ANDROID!" magic at offset 0 with a
     # garbage (non-boot) header. The curated android_boot validator rejects it, and
@@ -1438,6 +1451,7 @@ MANIFEST = [
     ("fw.dlk", dlink_dlk, "dlink_dlk", STRUCTURAL),
     ("fw.tlv", dlink_tlv, "dlink_tlv", STRUCTURAL),
     ("fw.engenius", engenius, "engenius", STRUCTURAL),
+    ("fw.dlink_ota", dlink_ota, "dlink_ota", VERIFIED),
     ("fw.lantronix", lantronix, "lantronix_firmware", STRUCTURAL),
     ("fw.rfp", rae_rfp, "rae_rfp", VERIFIED),
     ("fw.otra", otra, "otra", VERIFIED),
