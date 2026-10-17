@@ -47,6 +47,8 @@ python3 tests/test_jzlzma.py
 python3 tests/test_image_size.py
 # sxverity container (SpaceX dm-verity wrapper) identify + payload + FP guards (#55).
 python3 tests/test_sxverity.py
+# D-Link OTA container (Realtek Ameba single-byte-XOR) identify + derived-key descramble + FP guards.
+python3 tests/test_dlink_ota.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
 python3 tests/test_rae_rfp.py
 # Windows CE XIP ROM: ROMHDR resolution, module PE rebuild, CECompress decode.

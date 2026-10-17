@@ -1,0 +1,21 @@
+name = "dlink_ota"
+category = "encrypted"
+confidence = "structural"
+
+# D-Link OTA container: [u32 build][u32 count][count x 24-byte entries]. The first
+# entry's "OTA1" tag sits at offset 8; the deobf validator parses the entry table,
+# derives the single-byte XOR key from the Realtek Ameba image magic "81958711" in
+# the first payload, and confirms it. Keyless + self-validating, so a bare "OTA1"
+# with no valid entry table is rejected.
+magic_offset = 8
+validator = "deobf"
+
+[[magic]]
+ascii = "OTA1"
+endian = "little"
+
+[doc]
+description = "D-Link OTA container (Realtek Ameba single-byte-XOR payload; decryptable)."
+references = [
+  { title = "Realtek Ameba (RTL8710/8711) OTA image", url = "https://www.realtek.com/" },
+]
