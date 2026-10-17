@@ -38,6 +38,8 @@ python3 tests/test_legacy_fs.py
 python3 tests/test_luks.py
 # Legacy standalone .lzma identify (verified via trial-decode) + byte-exact extract + FP guards.
 python3 tests/test_lzma.py
+# bzip2 identify requires the 48-bit stream block magic, not just "BZh<n>" (FP guard).
+python3 tests/test_bzip2.py
 # Ingenic jzlzma (hardware LZ77) identify (verified via trial-decode) + byte-exact
 # extract + recursion + FP guards.
 python3 tests/test_jzlzma.py

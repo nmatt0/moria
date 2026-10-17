@@ -4,9 +4,18 @@ category = "compression"
 struct = """
   skip[3];
   u8 level;
+  u8 bm0; u8 bm1; u8 bm2; u8 bm3; u8 bm4; u8 bm5;
 """
-# "BZh" then a block-size digit 1-9.
-constraints = [ "level in 0x31..0x39" ]
+# "BZh" + a block-size digit 1-9, then the 48-bit stream block magic. Checking the
+# block magic lifts the test from 4 bytes to 10 and removes the structural false
+# positive where a chance "BZh<1-9>" in opaque/compressed data was identified as
+# bzip2 (it then failed to decompress). The 6 bytes after the header are the
+# first block's magic 0x314159265359 ("1AY&SY", the BCD digits of pi), or, for a
+# stream with no blocks, the end-of-stream magic 0x177245385090.
+constraints = [
+  "level in 0x31..0x39",
+  "(bm0 == 0x31 && bm1 == 0x41 && bm2 == 0x59 && bm3 == 0x26 && bm4 == 0x53 && bm5 == 0x59) || (bm0 == 0x17 && bm1 == 0x72 && bm2 == 0x45 && bm3 == 0x38 && bm4 == 0x50 && bm5 == 0x90)",
+]
 confidence = "structural"
 
 [[magic]]
