@@ -91,6 +91,7 @@ add_executable(moria
   src/extract/compressed.cpp
   src/extract/android_sparse.cpp
   src/extract/ext.cpp
+  src/extract/nilfs2.cpp
   src/extract/jffs2.cpp
   src/extract/ubifs.cpp
   src/extract/tar.cpp
@@ -254,6 +255,7 @@ if(Python3_Interpreter_FOUND)
     test_esp32_part
     test_esp32_nvs
     test_legacy_fs
+    test_nilfs2_extract
     test_luks
     test_lzma
     test_jzlzma

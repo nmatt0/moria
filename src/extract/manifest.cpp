@@ -23,6 +23,7 @@
 #include "extract/fat.hpp"
 #include "extract/iso9660.hpp"
 #include "extract/jffs2.hpp"
+#include "extract/nilfs2.hpp"
 #include "extract/ntfs.hpp"
 #include "extract/otra.hpp"
 #include "extract/rae_rfp.hpp"
@@ -56,6 +57,7 @@ Extractor find_extractor(const std::string& type) {
     if (type == "tar") return extract_tar;
     if (type == "romfs") return extract_romfs;
     if (type == "cramfs") return extract_cramfs;
+    if (type == "nilfs2") return extract_nilfs2;
     if (type == "erofs") return extract_erofs;
     if (type == "f2fs") return extract_f2fs;
     if (type == "android_sparse") return extract_android_sparse;
