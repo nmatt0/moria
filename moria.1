@@ -13,7 +13,7 @@ embedded formats (filesystems, containers, bootloaders, executables,
 compression, media) with byte offsets and confidence tiers. It is
 identification-first; with
 .B \-\-extract
-it also unpacks SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS, romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, HFS+, XFS, btrfs, EROFS, and ISO9660 filesystems, ZIP/tar/cpio/MS-CAB archives, CFBF compound files (Windows Installer .msi), U-Boot uImage/FIT containers, Windows CE XIP ROM images and registry hives, RAE Systems/Honeywell RFP firmware packages (LZARI-decompressing their sections), and Ingenic jzlzma-compressed kernel/rootfs images (hardware LZ77)
+it also unpacks SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS, romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, HFS+, XFS, btrfs, EROFS, NILFS2, and ISO9660 filesystems, ZIP/tar/cpio/MS-CAB archives, CFBF compound files (Windows Installer .msi), U-Boot uImage/FIT containers, Windows CE XIP ROM images and registry hives, RAE Systems/Honeywell RFP firmware packages (LZARI-decompressing their sections), and Ingenic jzlzma-compressed kernel/rootfs images (hardware LZ77)
 internally (no sudo). Every other format is still identified and located by offset, ready for another tool such as binwalk.
 .PP
 Output is human-readable by default. A single file shows a findings tree
@@ -55,7 +55,7 @@ List tar/cpio/zip/MS-CAB member names and sizes, or a Windows CE ROM's modules a
 .SS Extract
 .TP
 .BR \-e ", " \-\-extract
-Unpack identified SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS (incl. UBI), romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, EROFS, and ISO9660 filesystems, ZIP/tar/cpio/MS-CAB archives, CFBF compound files such as Windows Installer .msi packages, U-Boot uImage/FIT containers, Android boot/sparse images, Windows CE XIP ROM images, Windows CE registry hives, and RAE Systems/Honeywell RFP firmware packages into
+Unpack identified SquashFS, ext2/3/4, F2FS, JFFS2, UBIFS (incl. UBI), romfs, YAFFS2, cramfs, FAT, exFAT, NTFS, EROFS, NILFS2, and ISO9660 filesystems, ZIP/tar/cpio/MS-CAB archives, CFBF compound files such as Windows Installer .msi packages, U-Boot uImage/FIT containers, Android boot/sparse images, Windows CE XIP ROM images, Windows CE registry hives, and RAE Systems/Honeywell RFP firmware packages into
 .IR file .extracted/
 (one subdir per region, named
 .IR 0x<offset>\-<type> ).
