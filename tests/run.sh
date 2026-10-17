@@ -41,6 +41,8 @@ python3 tests/test_lzma.py
 # Ingenic jzlzma (hardware LZ77) identify (verified via trial-decode) + byte-exact
 # extract + recursion + FP guards.
 python3 tests/test_jzlzma.py
+# GIF/PNG sized to their real terminator (0x3B / IEND), not to EOF (issue #58).
+python3 tests/test_image_size.py
 # RFP section extraction + LZARI decode round-trip (self-contained hard gate).
 python3 tests/test_rae_rfp.py
 # Windows CE XIP ROM: ROMHDR resolution, module PE rebuild, CECompress decode.

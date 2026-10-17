@@ -591,13 +591,32 @@ def ihex():
     return line.encode()
 
 
+def _png_chunk(typ: bytes, data: bytes) -> bytes:
+    import zlib
+    return (struct.pack(">I", len(data)) + typ + data +
+            struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF))
+
+
 def png():
-    ihdr = struct.pack(">I", 13) + b"IHDR" + struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
-    return b"\x89PNG\r\n\x1a\n" + ihdr + b"\0" * 8
+    # A complete 1x1 PNG: signature + IHDR + IDAT + IEND, every chunk CRC valid
+    # (so the validator walks to IEND and reports `verified`). The 16-byte magic
+    # is sig(8) + IHDR length+tag, so this still matches the signature.
+    import zlib
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = _png_chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+    idat = _png_chunk(b"IDAT", zlib.compress(b"\x00\x00\x00\x00"))
+    iend = _png_chunk(b"IEND", b"")
+    return sig + ihdr + idat + iend
 
 
 def gif():
-    return b"GIF89a" + struct.pack("<HH", 1, 1) + b"\x00\x00\x00" + b"\0" * 8
+    # A complete 1x1 GIF89a: header + logical screen descriptor (no GCT) + one
+    # image descriptor (no LCT) + a minimal LZW data sub-block chain + the 0x3B
+    # trailer, so the validator walks to the trailer and reports `consistent`.
+    hdr = b"GIF89a" + struct.pack("<HH", 1, 1) + b"\x00\x00\x00"  # w,h,packed=0,bg,aspect
+    imgdesc = b"\x2c" + struct.pack("<HHHH", 0, 0, 1, 1) + b"\x00"  # left,top,w,h,packed=0
+    img_data = b"\x02" + b"\x01\x4c" + b"\x00"  # LZW min code size, 1-byte sub-block, terminator
+    return hdr + imgdesc + img_data + b"\x3b"
 
 
 def bmp():
