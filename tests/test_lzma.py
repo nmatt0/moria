@@ -17,6 +17,10 @@ Layers:
   3. Known-size header: correct declared size passes; wrong declared size rejected.
   4. FP guards: valid header + random payload rejected; a truncated stream (no end
      marker) rejected; a sub-threshold dict rejected.
+  5. Non-default props bytes (issue #45): streams built with (lc, lp, pb) other
+     than the xz default must still be identified + extracted. The anchor is the
+     format-invariant `00 00` (dict low 16 bits), not a fixed props value, so a
+     props-0x6D OpenWrt-style stream at an offset is found byte-exact.
 
 Run: python3 tests/test_lzma.py
 """
@@ -48,6 +52,13 @@ def lzma_findings(data: bytes):
 def real_alone(payload: bytes) -> bytes:
     """A genuine unknown-size (0xFF...) .lzma-alone stream: props 0x5D, 8 MiB dict."""
     return lzma.compress(payload, format=lzma.FORMAT_ALONE)
+
+
+def real_alone_props(payload: bytes, lc: int, lp: int, pb: int, dict_size: int = 8 << 20) -> bytes:
+    """A genuine .lzma-alone stream with explicit (lc, lp, pb) -> arbitrary props byte."""
+    filt = [{"id": lzma.FILTER_LZMA1, "dict_size": dict_size, "lc": lc, "lp": lp, "pb": pb}]
+    c = lzma.LZMACompressor(format=lzma.FORMAT_ALONE, filters=filt)
+    return c.compress(payload) + c.flush()
 
 
 def with_known_size(stream: bytes, size: int) -> bytes:
@@ -118,6 +129,46 @@ def main():
     baddict[1] = 0x00
     baddict[2] = 0x00
     check(not lzma_findings(bytes(baddict)), "FP: sub-threshold dict size was accepted")
+
+    # --- 5. non-default props bytes (issue #45) -----------------------------
+    # The old anchor was the fixed prefix `5D 00 00`, so any stream with a props
+    # byte other than 0x5D was invisible. Confirmed in the wild on OpenWrt ath79
+    # (props 0x6D = lc1/lp2/pb2). The anchor is now the format-invariant `00 00`
+    # (dict low 16 bits), so every valid (lc, lp, pb) is funneled to the validator.
+    # liblzma's encoder enforces lc + lp <= 4; the validator's props <= 224 check
+    # still covers the wider decode range, this just picks encoder-producible spread.
+    props_cases = [
+        (1, 2, 2),  # 0x6D — OpenWrt ath79 kernel, the reported case
+        (0, 0, 2),  # 0x5A
+        (2, 0, 2),  # 0x5C
+        (4, 0, 4),  # 0xB8 — high props, well off the 0x5D default
+    ]
+    for lc, lp, pb in props_cases:
+        props = (pb * 5 + lp) * 9 + lc
+        s = real_alone_props(payload, lc, lp, pb)
+        check(s[0] == props, f"props fixture byte mismatch for ({lc},{lp},{pb})")
+        # place it at a nonzero offset, as in real firmware (kernel after a header)
+        blob = b"\x00" * 0x200 + s
+        gs = lzma_findings(blob)
+        check(len(gs) == 1,
+              f"props 0x{props:02x} ({lc},{lp},{pb}): expected one finding, got {len(gs)}")
+        if gs:
+            check(gs[0]["confidence_tier"] == "verified",
+                  f"props 0x{props:02x}: tier {gs[0]['confidence_tier']}, want verified")
+            check(gs[0]["offset"] == 0x200, f"props 0x{props:02x}: offset {gs[0]['offset']:#x}")
+
+    # extract byte-exact for the reported OpenWrt (props 0x6D) case
+    ow = real_alone_props(payload, 1, 2, 2)
+    with tempfile.TemporaryDirectory() as t:
+        img = os.path.join(t, "ow.lzma")
+        with open(img, "wb") as f:
+            f.write(ow)
+        subprocess.run([MORIA, "-e", img], capture_output=True, timeout=120)
+        dec = os.path.join(img + ".extracted", "0x0-lzma", "decompressed")
+        check(os.path.exists(dec), "issue #45: props-0x6D extract produced no file")
+        if os.path.exists(dec):
+            with open(dec, "rb") as f:
+                check(f.read() == payload, "issue #45: props-0x6D extract not byte-exact")
 
     print("-" * 60)
     if fails:
