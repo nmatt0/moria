@@ -24,6 +24,7 @@
 #include "validators/rae_rfp.hpp"
 #include "validators/spiffs.hpp"
 #include "validators/squashfs.hpp"
+#include "validators/sxverity.hpp"
 #include "validators/tar.hpp"
 #include "validators/uboot_env.hpp"
 #include "validators/ubi.hpp"
@@ -56,6 +57,7 @@ Validator find_validator(const std::string& name) {
     if (name == "tar") return validate_tar;
     if (name == "zip") return validate_zip;
     if (name == "jpeg") return validate_jpeg;
+    if (name == "sxverity") return validate_sxverity;
     if (name == "png") return validate_png;
     if (name == "gif") return validate_gif;
     if (name == "rae_rfp") return validate_rae_rfp;

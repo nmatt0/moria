@@ -126,6 +126,7 @@ add_executable(moria
   src/validators/jpeg.cpp
   src/validators/png.cpp
   src/validators/gif.cpp
+  src/validators/sxverity.cpp
   src/validators/otra.cpp
   src/validators/rae_rfp.cpp
   src/validators/wince_rom.cpp
@@ -257,6 +258,7 @@ if(Python3_Interpreter_FOUND)
     test_lzma
     test_jzlzma
     test_image_size
+    test_sxverity
     test_rae_rfp
     test_otra
     test_wince_rom
