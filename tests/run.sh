@@ -34,6 +34,8 @@ python3 tests/test_jzlzma_raw.py
 python3 tests/test_esp32_nvs.py
 # Legacy block filesystems: NILFS2/Minix/ReiserFS/UFS/APFS/LogFS identify (+ real mkfs.minix).
 python3 tests/test_legacy_fs.py
+# ReiserFS extraction: synthetic 3.5/3.6 round-trip + real empty mkreiserfs image.
+python3 tests/test_reiserfs_extract.py
 # LUKS1/LUKS2 identify with header parameters (synthetic + real cryptsetup).
 python3 tests/test_luks.py
 # Legacy standalone .lzma identify (verified via trial-decode) + byte-exact extract + FP guards.
