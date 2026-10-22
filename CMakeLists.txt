@@ -258,6 +258,7 @@ if(Python3_Interpreter_FOUND)
     test_legacy_fs
     test_reiserfs_extract
     test_nilfs2_extract
+    test_romfs_sizecap
     test_luks
     test_lzma
     test_jzlzma

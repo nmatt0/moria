@@ -38,6 +38,8 @@ python3 tests/test_legacy_fs.py
 python3 tests/test_reiserfs_extract.py
 # NILFS2 extraction: empty real image + populated round-trip (self-skips without privilege).
 python3 tests/test_nilfs2_extract.py
+# romfs oversized-size-field clamp (issue #68): crafted size must not crash/over-allocate.
+python3 tests/test_romfs_sizecap.py
 # LUKS1/LUKS2 identify with header parameters (synthetic + real cryptsetup).
 python3 tests/test_luks.py
 # Legacy standalone .lzma identify (verified via trial-decode) + byte-exact extract + FP guards.
