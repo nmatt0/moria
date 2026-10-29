@@ -13,6 +13,7 @@ constraints = [
   "sf1 < 16",
 ]
 
+validator = "xz"            # verifies the stream-header CRC32 over the 2 stream-flag bytes
 confidence = "structural"
 
 # xz stream header: 6-byte magic, then 2 stream-flag bytes.
