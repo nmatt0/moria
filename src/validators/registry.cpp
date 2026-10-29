@@ -31,6 +31,7 @@
 #include "validators/uefi_fv.hpp"
 #include "validators/uimage.hpp"
 #include "validators/upx.hpp"
+#include "validators/xz.hpp"
 #include "validators/vbf.hpp"
 #include "validators/vbmeta.hpp"
 #include "validators/verity.hpp"
@@ -65,6 +66,7 @@ Validator find_validator(const std::string& name) {
     if (name == "wince_hive") return validate_wince_hive;
     if (name == "vbf") return validate_vbf;
     if (name == "upx") return validate_upx;
+    if (name == "xz") return validate_xz;
     if (name == "verity") return validate_verity;
     if (name == "vbmeta") return validate_vbmeta;
     if (name == "uefi_fv") return validate_uefi_fv;

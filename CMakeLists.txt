@@ -120,6 +120,7 @@ add_executable(moria
   src/validators/uimage.cpp
   src/validators/elf.cpp
   src/validators/upx.cpp
+  src/validators/xz.cpp
   src/validators/cpio.cpp
   src/validators/ihex.cpp
   src/validators/yaffs2.cpp

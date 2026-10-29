@@ -328,7 +328,20 @@ def gzip():
 
 
 def xz():
-    return bytes([0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00, 0x00, 0x04]) + b"\0" * 16
+    # Valid xz stream header: magic(6) | stream flags(2) | CRC32(flags)(4, LE).
+    # The validator checks that CRC32, so a magic-only stub would be rejected.
+    import binascii
+    flags = bytes([0x00, 0x04])  # check-id 4 (CRC64)
+    crc = struct.pack("<I", binascii.crc32(flags) & 0xFFFFFFFF)
+    return bytes([0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00]) + flags + crc + b"\0" * 16
+
+
+def xz_fp_badcrc():
+    # Magic + plausible stream flags but a WRONG stream-header CRC32: a blob that
+    # merely starts with the xz magic (e.g. a kernel's "\xfd""7zXZ\0 XZ decompressor
+    # ..." string table) must NOT be identified as xz.
+    return bytes([0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00, 0x00, 0x00]) + \
+        b"XZ decompressor ran out of memory\x00\x00\x00Input is not in the xz format"
 
 
 def lz4():
@@ -350,8 +363,8 @@ def zstd():
 
 def lzma_alone():
     # A real legacy .lzma "alone" stream (props 0x5D, 8 MiB dict, size-unknown
-    # marker) that decodes to a clean end marker. Unlike the magic-only gzip/xz
-    # fixtures, the lzma validator trial-decodes, so the fixture must be genuine.
+    # marker) that decodes to a clean end marker. Unlike the magic-only gzip
+    # fixture, the lzma validator trial-decodes, so the fixture must be genuine.
     import lzma
     payload = b"MORIA lzma alone fixture: the quick brown fox. " * 400
     return lzma.compress(payload, format=lzma.FORMAT_ALONE)
@@ -1410,7 +1423,8 @@ MANIFEST = [
     ("device.dtb", dtb, "dtb", CONSISTENT),
     ("kernel.uimage", uimage, "uimage", VERIFIED),
     ("blob.gz", gzip, "gzip", STRUCTURAL),
-    ("blob.xz", xz, "xz", STRUCTURAL),
+    ("blob.xz", xz, "xz", VERIFIED),
+    ("xz_fp_badcrc.bin", xz_fp_badcrc, None, None),
     ("blob.lz4", lz4, "lz4", STRUCTURAL),
     ("blob.lz4l", lz4_legacy, "lz4_legacy", STRUCTURAL),
     ("blob.zst", zstd, "zstd", STRUCTURAL),
