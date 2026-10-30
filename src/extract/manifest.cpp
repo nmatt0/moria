@@ -22,6 +22,7 @@
 #include "extract/zip.hpp"
 #include "extract/f2fs.hpp"
 #include "extract/fat.hpp"
+#include "extract/ihex.hpp"
 #include "extract/iso9660.hpp"
 #include "extract/jffs2.hpp"
 #include "extract/nilfs2.hpp"
@@ -63,6 +64,7 @@ Extractor find_extractor(const std::string& type) {
     if (type == "erofs") return extract_erofs;
     if (type == "f2fs") return extract_f2fs;
     if (type == "android_sparse") return extract_android_sparse;
+    if (type == "ihex") return extract_ihex;
     if (type == "zip") return extract_zip;
     if (type == "android_boot") return extract_android_boot;
     if (type == "fat" || type == "vfat" || type == "fat32") return extract_fat;
