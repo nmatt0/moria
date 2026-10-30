@@ -89,6 +89,7 @@ add_executable(moria
   src/extract/upx.cpp
   src/extract/fit.cpp
   src/extract/compressed.cpp
+  src/extract/ihex.cpp
   src/extract/android_sparse.cpp
   src/extract/ext.cpp
   src/extract/reiserfs.cpp
@@ -248,6 +249,7 @@ if(Python3_Interpreter_FOUND)
   set(_moria_py_tests
     test_samples
     test_extract
+    test_ihex_extract
     test_human_tree
     test_partition
     test_littlefs
