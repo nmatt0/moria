@@ -170,6 +170,37 @@ def main():
             with open(dec, "rb") as f:
                 check(f.read() == payload, "issue #45: props-0x6D extract not byte-exact")
 
+    # --- 6. low-entropy false positives (issue #74) -------------------------
+    # The trial decode is NOT a sufficient FP guard in LOW-entropy data. Over a
+    # run of zeros a minimal header (props 0x00, a declared 1-2 byte size) is
+    # followed by zero bytes that the range coder decodes to that tiny size and a
+    # clean end marker, so structured tables and flash padding produced storms of
+    # bogus "Verified" findings (222 in one firmware's chip-ID table; 768 across
+    # the corpus). The validator now rejects a compressed span dominated by a
+    # single byte value. Real LZMA range-coder output is near-uniform, so this
+    # drops every low-entropy FP and keeps every genuine stream.
+    #
+    # Faithful FP fixture: a minimal valid .lzma header inside zero padding. This
+    # is the real on-flash shape, not an encoder's output (liblzma never emits a
+    # zero-dominated stream), so it is built by hand.
+    deg_hdr = bytes([0x00]) + struct.pack("<I", 0x10000) + struct.pack("<Q", 2)
+    zero_region = b"\x00" * 0x100 + deg_hdr + b"\x00" * 0x100
+    check(not lzma_findings(zero_region),
+          "issue #74: zero-dominated region was identified as lzma (byte-dominance gate missing)")
+    # An 0xFF flash-erase region behaves the same way; it must also stay quiet.
+    ff_region = b"\xff" * 0x100 + bytes([0x00]) + struct.pack("<I", 0x10000) + \
+        struct.pack("<Q", 2) + b"\x00" * 0x40
+    check(not lzma_findings(ff_region),
+          "issue #74: single-value-dominated region identified as lzma")
+    # Critical TP guard: a SMALL real stream must survive. Its compressed span is
+    # short, so a naive Shannon-entropy floor (which is capped at log2(len) on a
+    # short span) would clip it; the byte-dominance test does not.
+    for n in (256, 1024, 4096):
+        small = real_alone(b"small real lzma payload, issue #74 guard. " * (n // 40 + 1))
+        gs = lzma_findings(small)
+        check(len(gs) == 1,
+              f"issue #74: small real stream (~{len(small)}B span) dropped, got {len(gs)} findings")
+
     print("-" * 60)
     if fails:
         for m in fails:
