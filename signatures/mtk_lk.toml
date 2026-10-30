@@ -1,0 +1,35 @@
+name = "mtk_lk"
+category = "bootloader"
+
+# MediaTek LK ("Little Kernel") / bootloader image. A 48-byte header, padded to a
+# 512-byte page, precedes the payload:
+#   u32 magic (0x58881688); u32 size (payload bytes after the header);
+#   char name[32] (partition label, e.g. "lk"/"LK"); u32 loadaddr; u32 mode.
+# Distinct from the Qualcomm LK/aboot image (signatures/lk.toml), which has no
+# fixed magic word and keys on an ASCII "LK\0\0" tag at offset 8.
+magic_offset = 0
+
+struct = """
+  bytes[4] magic;
+  u32 size;
+"""
+
+# Light hard constraint; the validator does the real discrimination (a printable
+# partition name at offset 8, payload fits the file) and sets the tier.
+constraints = [
+  "size > 0",
+]
+
+confidence = "structural"
+validator = "mtk_lk"
+
+[[magic]]
+hex = "88168858"
+endian = "little"
+
+[doc]
+description = "MediaTek LK (Little Kernel) bootloader image."
+vendor = "MediaTek"
+references = [
+  { title = "U-Boot MediaTek image header (lk_hdr / LK_PART_MAGIC)", url = "https://github.com/trini/u-boot/blob/master/tools/mtk_image.h" },
+]

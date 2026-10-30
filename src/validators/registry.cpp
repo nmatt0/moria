@@ -1,6 +1,7 @@
 #include "validators/registry.hpp"
 
 #include "validators/android_boot.hpp"
+#include "validators/mtk_lk.hpp"
 #include "validators/cab.hpp"
 #include "validators/cfbf.hpp"
 #include "validators/cpio.hpp"
@@ -44,6 +45,7 @@ namespace ft {
 
 Validator find_validator(const std::string& name) {
     if (name == "android_boot") return validate_android_boot;
+    if (name == "mtk_lk") return validate_mtk_lk;
     if (name == "deobf") return validate_deobf;
     if (name == "squashfs") return validate_squashfs;
     if (name == "uimage") return validate_uimage;
