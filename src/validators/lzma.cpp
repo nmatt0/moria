@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "entropy.hpp"
 #include "extract/decompress.hpp"
 
 namespace ft {
@@ -23,6 +24,15 @@ constexpr uint32_t kMaxDict = 768u << 20;
 // payload, so a real stream reaches its end marker, while a decompression bomb
 // cannot make identify decode unbounded output.
 constexpr size_t kProbeCap = 512u << 20;
+// Reject a compressed span dominated by a single byte value. The trial decode
+// is not enough on its own: `.lzma-alone` is magicless, and over a run of zeros
+// (or an 0xFF erase region) a 13-byte header declaring a 1-2 byte payload
+// decodes trivially to a clean end marker, so structured tables and padding
+// produce storms of bogus Verified findings. Real LZMA range-coder output is
+// near-uniform, so its most common byte is a few percent of the span; the false
+// positives observed across the corpus sit at 84-99.9%. A 0.50 cut drops every
+// one with a wide margin and keeps every genuine stream (max observed 0.6%).
+constexpr double kMaxByteDominance = 0.50;
 
 }  // namespace
 
@@ -42,14 +52,19 @@ bool validate_lzma(ValidatorCtx& ctx) {
     const bool known = (*usize != kUnknownSize);
     if (known && (*usize == 0 || *usize > kProbeCap)) return false;  // implausible declared size
 
-    // FP-proof gate: trial-decode to a clean end-of-stream marker. A stray
-    // `?? 00 00 ...` cannot reach the marker, so it is rejected here.
+    // Trial-decode to a clean end-of-stream marker. A stray `?? 00 00 ...` in
+    // high-entropy data cannot reach the marker, so it is rejected here.
     auto src = r.bytes(off, r.size() - off);
     if (!src) return false;
     size_t consumed = 0;
     auto decoded = lzma_alone_probe(*src, kProbeCap, &consumed);
     if (!decoded) return false;
     if (known && *decoded != *usize) return false;  // declared size must match actual
+
+    // The decode alone is not FP-proof in LOW-entropy data: a zero run forms a
+    // valid short stream that reaches the marker. Require the compressed span to
+    // look like compressed data (no single byte value dominating it).
+    if (max_byte_fraction(src->subspan(0, consumed)) > kMaxByteDominance) return false;
 
     Finding& out = ctx.out;
     out.type = "lzma";
