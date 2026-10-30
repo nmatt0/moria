@@ -117,6 +117,7 @@ add_executable(moria
   src/walk.cpp
   src/validators/registry.cpp
   src/validators/android_boot.cpp
+  src/validators/mtk_lk.cpp
   src/validators/squashfs.cpp
   src/validators/uimage.cpp
   src/validators/elf.cpp
@@ -277,6 +278,7 @@ if(Python3_Interpreter_FOUND)
     test_uboot_env
     test_vbmeta
     test_fit_signing
+    test_mtk_lk
     test_upx
     test_upx_extract
     test_carve

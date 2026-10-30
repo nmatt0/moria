@@ -697,6 +697,18 @@ def lk_image():
     return bytes(b)
 
 
+def mtk_lk_image():
+    # MediaTek LK header (lk_hdr): u32 magic 0x58881688, u32 payload size,
+    # char name[32], u32 loadaddr, u32 mode; 48 bytes padded to a 512-byte page.
+    payload = bytes((i * 7) & 0xFF for i in range(2048))
+    hdr = bytearray(512)
+    struct.pack_into("<I", hdr, 0, 0x58881688)
+    struct.pack_into("<I", hdr, 4, len(payload))
+    hdr[8:10] = b"lk"
+    struct.pack_into("<I", hdr, 40, 0x41E00000)
+    return bytes(hdr) + payload
+
+
 def uboot():
     return b"\x00" * 64 + b"U-Boot 2019.07-rc1 (Aug 01 2019 - 12:00:00 +0000)\x00" + b"\xff" * 64
 
@@ -1442,6 +1454,7 @@ MANIFEST = [
     ("super.sparse", android_sparse, "android_sparse", CONSISTENT),
     ("pieeprom.bin", rpi_eeprom, "rpi_eeprom", STRUCTURAL),
     ("aboot.lk", lk_image, "lk", MAGIC),
+    ("lk.mtk", mtk_lk_image, "mtk_lk", CONSISTENT),
     ("u-boot.bin", uboot, "uboot", MAGIC),
     ("uboot.env", uboot_env, "uboot_env", VERIFIED),
     ("vbmeta.img", vbmeta, "vbmeta", CONSISTENT),

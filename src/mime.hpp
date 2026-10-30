@@ -79,6 +79,7 @@ inline const char* mime_for_type(const std::string& t) {
     if (t == "vbmeta") return "application/x-avb-vbmeta";
     if (t == "uefi_fv") return "application/x-uefi-firmware-volume";
     if (t == "lk") return "application/x-lk-bootloader";
+    if (t == "mtk_lk") return "application/x-mediatek-lk-bootloader";
     // --- partition tables -------------------------------------------------
     if (t == "gpt") return "application/x-gpt";
     if (t == "mbr") return "application/x-mbr";
