@@ -190,7 +190,7 @@ void scan_nodes(Ctx& c) {
             auto csize = r32(c, pos + 48);
             auto dsize = r32(c, pos + 52);
             auto compr = c.r.bytes(pos + 56, 1);
-            if (ino && version && mode && isize && doff && csize && dsize && compr) {
+            if (*ino && *version && *mode) {
                 InodeInfo& in = c.inodes[*ino];
                 if (*version >= in.newest) {
                     in.newest = *version;
@@ -239,10 +239,19 @@ void walk_dir(Ctx& c, uint32_t pino, const std::string& rel, size_t depth) {
             if (d->ino == 0) continue;  // deleted
             if (name == "." || name == ".." || name.find('/') != std::string::npos) continue;
             const std::string child_rel = rel.empty() ? name : rel + "/" + name;
-            write_inode(c, d->ino, child_rel);
+            // If we have inode metadata, write the filesystem object for it.
             auto ci = c.inodes.find(d->ino);
-            if (ci != c.inodes.end() && (ci->second.mode & S_IFMT) == S_IFDIR)
+            if (ci != c.inodes.end()) {
+                write_inode(c, d->ino, child_rel);
+                if ((ci->second.mode & S_IFMT) == S_IFDIR)
+                    walk_dir(c, d->ino, child_rel, depth + 1);
+            } else if (c.dirents.count(d->ino)) {
+                // No inode node, but this ino has its own dirents: it is a
+                // directory whose inode node was not detected. Create it and
+                // recurse so its children are still extracted.
+                if (c.root.make_dir(c.subdir + "/" + child_rel)) c.out.dirs++;
                 walk_dir(c, d->ino, child_rel, depth + 1);
+            }
         }
     }
     c.stack.erase(pino);
