@@ -251,6 +251,11 @@ void walk_dir(Ctx& c, uint32_t pino, const std::string& rel, size_t depth) {
                 // recurse so its children are still extracted.
                 if (c.root.make_dir(c.subdir + "/" + child_rel)) c.out.dirs++;
                 walk_dir(c, d->ino, child_rel, depth + 1);
+            } else {
+                // A dirent names an inode we never saw, and it has no dirents of
+                // its own: a genuinely lost file/node. Flag the result partial so
+                // the dropped object is not reported as a complete extraction.
+                c.truncated = true;
             }
         }
     }
