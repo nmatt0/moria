@@ -3,12 +3,20 @@ category = "filesystem"
 
 # FAT32 boot sector: the FS-type string "FAT32   " sits at offset 82. The BPB
 # gives bytes-per-sector (@11) and the 32-bit sector count (@32).
+#
+# As with FAT12/16, the "FAT32   " text is only a label and appears verbatim in
+# firmware FAT-driver code, so confirm the mandatory BPB invariants (power-of-
+# two bytes-per-sector and sectors-per-cluster, non-zero FAT count) rather than
+# trusting a bare 512..4096 range on bytes-per-sector.
 magic_offset = 82
 
 struct = """
   skip[11];
   u16 bytes_per_sec;
-  skip[19];
+  u8 sec_per_clus;
+  skip[2];
+  u8 num_fats;
+  skip[15];
   u32 total_sec32;
   skip[46];
   bytes[5] fstype;
@@ -16,6 +24,10 @@ struct = """
 
 constraints = [
   "bytes_per_sec in 512..4096",
+  "(bytes_per_sec & (bytes_per_sec - 1)) == 0",
+  "sec_per_clus != 0",
+  "(sec_per_clus & (sec_per_clus - 1)) == 0",
+  "num_fats != 0",
   "total_sec32 > 0",
 ]
 
