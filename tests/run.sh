@@ -34,6 +34,9 @@ python3 tests/test_jzlzma_raw.py
 python3 tests/test_esp32_nvs.py
 # Legacy block filesystems: NILFS2/Minix/ReiserFS/UFS/APFS/LogFS identify (+ real mkfs.minix).
 python3 tests/test_legacy_fs.py
+# FAT12/16/32 identify: the FS-type label must be confirmed by the BPB (power-of-two
+# bytes-per-sector/sectors-per-cluster, non-zero FAT count), not matched on its own.
+python3 tests/test_fat_id.py
 # ReiserFS extraction: synthetic 3.5/3.6 round-trip + real empty mkreiserfs image.
 python3 tests/test_reiserfs_extract.py
 # NILFS2 extraction: empty real image + populated round-trip (self-skips without privilege).

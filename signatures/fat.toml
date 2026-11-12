@@ -5,12 +5,22 @@ category = "filesystem"
 # offset 54. The BPB gives bytes-per-sector (@11); exactly one of the 16-bit
 # (@19) and 32-bit (@32) sector counts is set, so their sum times the sector
 # size is the volume size.
+#
+# The FS-type string is only a label; firmware ships the literal "FAT12   " /
+# "FAT16   " text in FAT-driver code and format tables (e.g. VxWorks dosFsLib),
+# so the match is confirmed against the mandatory BPB invariants that the
+# extractor also enforces (src/extract/fat.cpp): bytes-per-sector and
+# sectors-per-cluster are powers of two and the FAT count is non-zero. A plain
+# 512..4096 range let non-power-of-two garbage (e.g. 2601) through.
 magic_offset = 54
 
 struct = """
   skip[11];
   u16 bytes_per_sec;
-  skip[6];
+  u8 sec_per_clus;
+  skip[2];
+  u8 num_fats;
+  skip[2];
   u16 total_sec16;
   skip[11];
   u32 total_sec32;
@@ -20,6 +30,10 @@ struct = """
 
 constraints = [
   "bytes_per_sec in 512..4096",
+  "(bytes_per_sec & (bytes_per_sec - 1)) == 0",
+  "sec_per_clus != 0",
+  "(sec_per_clus & (sec_per_clus - 1)) == 0",
+  "num_fats != 0",
 ]
 
 size = "(total_sec16 + total_sec32) * bytes_per_sec"

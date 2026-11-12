@@ -111,7 +111,9 @@ def exfat():
 
 def fat():
     b = _buf(512)
-    struct.pack_into("<H", b, 11, 512)   # bytes per sector
+    struct.pack_into("<H", b, 11, 512)   # bytes per sector (power of two)
+    b[13] = 4                            # sectors per cluster (power of two)
+    b[16] = 2                            # number of FATs (non-zero)
     struct.pack_into("<H", b, 19, 4096)  # total_sec16
     b[54:59] = b"FAT16"                   # FS-type string @54
     return bytes(b)
@@ -119,7 +121,9 @@ def fat():
 
 def fat32():
     b = _buf(512)
-    struct.pack_into("<H", b, 11, 512)     # bytes per sector
+    struct.pack_into("<H", b, 11, 512)     # bytes per sector (power of two)
+    b[13] = 8                              # sectors per cluster (power of two)
+    b[16] = 2                              # number of FATs (non-zero)
     struct.pack_into("<I", b, 32, 131072)  # total_sec32
     b[82:87] = b"FAT32"                     # FS-type string @82
     return bytes(b)
