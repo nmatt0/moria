@@ -150,6 +150,7 @@ struct Ctx {
     std::vector<Node> nodes;
     std::set<uint32_t> visited;
     bool truncated = false;
+    bool hit_limit = false;        // stopped because the caller's byte/file budget was reached
 };
 
 // Read a fork's extents (in `blob`) into a contiguous byte buffer up to `want`.
@@ -271,6 +272,14 @@ void walk(Ctx& c, uint32_t cnid, const std::string& rel, size_t depth) {
     auto it = c.by_parent.find(cnid);
     if (it == c.by_parent.end()) return;
     for (size_t idx : it->second) {
+        // Stop within this filesystem too once the run-wide byte/file budget is
+        // reached, so a single huge volume cannot blow past --max-bytes/--max-files.
+        if ((c.out.limit_files && c.out.files >= c.out.limit_files) ||
+            (c.out.limit_bytes && c.out.bytes >= c.out.limit_bytes)) {
+            c.hit_limit = true;
+            c.truncated = true;
+            return;
+        }
         const Node& n = c.nodes[idx];
         if (n.name.empty() || n.name == "." || n.name == "..") continue;
         if (n.name.find('/') != std::string::npos) continue;  // never split a name
@@ -324,7 +333,7 @@ bool extract_hfsplus(const Reader& r, const Finding& f, SafeRoot& root, const st
         return true;
     }
 
-    Ctx c{r, f.offset, block_size, *tblocks, root, subdir, out, {}, {}, {}, {}, false};
+    Ctx c{r, f.offset, block_size, *tblocks, root, subdir, out, {}, {}, {}, {}, false, false};
 
     // Catalog File fork lives at volume-header offset 272.
     const uint64_t cat_fork = vh + 272;
@@ -351,6 +360,9 @@ bool extract_hfsplus(const Reader& r, const Finding& f, SafeRoot& root, const st
 
     collect_records(c, node_size, first_leaf);
     walk(c, ROOT_CNID, "", 0);
+
+    out.hit_limit = c.hit_limit;
+    if (c.hit_limit) out.warnings.push_back("stopped at the extraction size/file limit");
 
     out.status = c.truncated ? "partial" : "ok";
     return true;
