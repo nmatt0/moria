@@ -41,6 +41,9 @@ python3 tests/test_fat_id.py
 python3 tests/test_reiserfs_extract.py
 # NILFS2 extraction: empty real image + populated round-trip (self-skips without privilege).
 python3 tests/test_nilfs2_extract.py
+# HFS+ extraction: synthetic round-trip (extents-overflow, '/'-in-name, decmpfs/resource-fork
+# diagnostics), a mid-walk --max-files cap, and corruption robustness.
+python3 tests/test_hfsplus_extract.py
 # romfs oversized-size-field clamp (issue #68): crafted size must not crash/over-allocate.
 python3 tests/test_romfs_sizecap.py
 # LUKS1/LUKS2 identify with header parameters (synthetic + real cryptsetup).
