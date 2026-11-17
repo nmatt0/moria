@@ -28,6 +28,14 @@ struct Extracted {
     size_t bytes = 0;          // total uncompressed bytes written
     uint64_t consumed = 0;     // input bytes this finding spanned (0 = unknown)
     size_t depth = 1;          // recursion level (1 = top-level input)
+    // Caller-set budget for THIS extraction (0 = unlimited). The run-wide
+    // --max-bytes/--max-files ceiling is otherwise checked only between extractor
+    // calls, so an extractor that can emit an unbounded amount from one region (a
+    // whole filesystem) honors these and sets `hit_limit` when it stops early.
+    // Most extractors ignore them.
+    uint64_t limit_bytes = 0;
+    size_t limit_files = 0;
+    bool hit_limit = false;    // extractor stopped because a limit above was reached
     std::vector<std::string> warnings;
     // The identification that spawned this extraction, kept so the human tree can
     // show the same TIER/NOTES a standalone scan of the produced file would (its

@@ -338,9 +338,16 @@ void extract_findings(ft::Reader& reader, const std::vector<ft::Finding>& findin
         ft::Extracted e;
         e.depth = level;
         e.finding = f;  // keep the identification for the human extraction tree
+        // Remaining run-wide budget for this one extraction (both > 0 here: the
+        // loop breaks above once a total reaches its max). Lets an extractor that
+        // walks a whole filesystem stop at the ceiling instead of blowing past it.
+        e.limit_bytes = c.max_bytes - c.total_bytes;
+        e.limit_files = c.max_files - c.total_files;
         ex(reader, f, c.root, sub, e);
         c.total_files += e.files;
         c.total_bytes += e.bytes;
+        if (e.hit_limit)
+            mark_capped(c, c.total_bytes >= c.max_bytes ? "max-bytes" : "max-files");
         if (f.type == "android_sparse" && e.consumed)
             sparse_end = std::max<uint64_t>(sparse_end, f.offset + e.consumed);
         if (is_comp && e.consumed)
