@@ -266,6 +266,14 @@ void collect_records(Ctx& c, uint32_t node_size, uint32_t first_leaf) {
     }
 }
 
+// HFS+ allows '/' in a name (the POSIX layer shows it as ':'). Keep it a single
+// path component by swapping '/' -> ':' rather than dropping the record (which
+// would discard a whole subtree if the name is a directory's).
+std::string sanitize_component(std::string name) {
+    std::replace(name.begin(), name.end(), '/', ':');
+    return name;
+}
+
 void walk(Ctx& c, uint32_t cnid, const std::string& rel, size_t depth) {
     if (depth > MAX_DEPTH) { c.truncated = true; return; }
     if (!c.visited.insert(cnid).second) return;  // cycle guard on CNID
@@ -282,8 +290,8 @@ void walk(Ctx& c, uint32_t cnid, const std::string& rel, size_t depth) {
         }
         const Node& n = c.nodes[idx];
         if (n.name.empty() || n.name == "." || n.name == "..") continue;
-        if (n.name.find('/') != std::string::npos) continue;  // never split a name
-        const std::string child = rel.empty() ? n.name : rel + "/" + n.name;
+        const std::string name = sanitize_component(n.name);
+        const std::string child = rel.empty() ? name : rel + "/" + name;
         const std::string full = c.subdir + "/" + child;
         if (n.is_dir) {
             if (c.root.make_dir(full)) c.out.dirs++;
