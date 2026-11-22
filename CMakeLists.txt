@@ -82,6 +82,7 @@ add_executable(moria
   src/extract/lzari.cpp
   src/extract/jzlzma.cpp
   src/extract/vbf.cpp
+  src/extract/vfw.cpp
   src/extract/sonicare_upg.cpp
   src/extract/vbmeta.cpp
   src/extract/lzss.cpp
@@ -140,6 +141,7 @@ add_executable(moria
   src/validators/cfbf.cpp
   src/validators/wince_hive.cpp
   src/validators/vbf.cpp
+  src/validators/vfw.cpp
   src/validators/sonicare_upg.cpp
   src/validators/verity.cpp
   src/validators/vbmeta.cpp

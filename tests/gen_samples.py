@@ -1029,13 +1029,17 @@ def vbf():
     return hdr + block(0x00FD0000, b0) + block(0x10000400, b1)
 
 
+def vfw():
+    # VFW firmware container: 16-byte header (8-byte ASCII magic, u32 LE
+    # payload_size, u32 LE CRC-32 over payload) then raw firmware payload.
+    # CRC-32 verified over payload -> verified.
+    payload = bytes((i * 7 + 3) & 0xFF for i in range(512))
+    crc = zlib.crc32(payload) & 0xFFFFFFFF
+    header = b"VFWMCUF1" + struct.pack("<II", len(payload), crc)
+    return header + payload
+
+
 def sonicare_upg():
-    # Philips Sonicare ".upg" firmware container: 56-byte header (magic,
-    # reserved=0xFFFFFFFF, payload_size, format_version=1, header_length=0x38,
-    # padding) then a payload (16-byte opaque prefix + constant 8-byte tag +
-    # NUL-padded ASCII label + filler) then a 16-byte trailer.
-    # header_length + payload_size + 16 landing exactly on EOF + tag match
-    # -> verified.
     payload = (bytes((i * 31 + 7) & 0xFF for i in range(16)) +   # opaque prefix
                bytes.fromhex("0100140102000000") +                # observed-constant tag
                b"TESTBOOT" + bytes(8) +                           # NUL-padded label
@@ -1510,6 +1514,7 @@ MANIFEST = [
     ("installer.msi", cfbf, "cfbf", VERIFIED),
     ("default.hv", wince_hive, "wince_hive", CONSISTENT),
     ("fw.vbf", vbf, "vbf", VERIFIED),
+    ("fw.vfw", vfw, "vfw", VERIFIED),
     ("fw.upg", sonicare_upg, "sonicare_upg", VERIFIED),
     ("android_magic_string.bin", android_magic_string, None, 0),
     ("android_magic_at_zero.bin", android_magic_at_zero, None, 0),

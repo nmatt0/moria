@@ -1,0 +1,33 @@
+name = "vfw"
+category = "firmware"
+
+# VFW: a wearable/IoT firmware container used by health-tracking smartwatches.
+# 16-byte fixed header: 8-byte ASCII magic ("VFW" + 3-byte component class +
+# 2-byte variant), u32 LE payload_size, u32 LE CRC-32 (IEEE) over the payload.
+# Component classes observed: MCU (main application), BLE (radio), GPS
+# (positioning), WFS (watch-face/resource). The payload follows immediately
+# after the header and continues to EOF. MCU payloads are typically raw ARM
+# Cortex-M binaries (vector table at payload offset 0); BLE/GPS/WFS payloads
+# are opaque blobs. The validator checks payload_size against bytes available
+# and verifies the CRC-32.
+struct = """
+  bytes[3] prefix;
+  bytes[3] component;
+  bytes[2] variant;
+  u32 payload_size;
+  u32 crc32;
+"""
+
+constraints = [
+  "payload_size > 0",
+  "payload_size <= _avail",
+]
+
+validator = "vfw"
+
+[[magic]]
+ascii = "VFW"
+endian = "little"
+
+[doc]
+description = "VFW firmware container: 16-byte header (8-byte ASCII magic, u32 LE payload_size, u32 LE CRC-32 over payload) followed by a raw firmware payload (MCU/BLE/GPS/WFS)."
