@@ -15,7 +15,7 @@ import tempfile
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MORIA = os.path.join(HERE, "..", "build", "moria")
+MORIA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "build", "moria")
 
 
 def build_vfw(magic, payload):
@@ -106,6 +106,15 @@ def main():
 
     bad_crc = b"VFWMCUF1" + struct.pack("<II", len(mcu_payload), 0xDEADBEEF) + mcu_payload
     rc |= test_identify(bad_crc, "consistent", "id-consistent")
+
+    # Structural: bad CRC and payload does NOT span to EOF (trailing junk)
+    trailing = bad_crc + b"\xff" * 200
+    rc |= test_identify(trailing, "structural", "id-structural")
+
+    # Non-printable component/variant: payload_name falls back to "payload.bin"
+    binmagic_payload = bytes((i * 41 + 9) & 0xFF for i in range(128))
+    rc |= run(build_vfw(b"VFW\x00\x01\x02\x80\xff", binmagic_payload),
+              "payload.bin", binmagic_payload, "binary-magic")
 
     if rc == 0:
         print("PASS")

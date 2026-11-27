@@ -70,6 +70,8 @@ python3 tests/test_wince_hive.py
 python3 tests/test_cfbf.py
 # VBF block extraction + LZSS decode round-trip (self-contained hard gate).
 python3 tests/test_vbf.py
+# VFW firmware container: CRC-32-verified extraction round-trip + confidence tiers.
+python3 tests/test_vfw.py
 # Philips Sonicare ".upg": identification (tag-gated verified), label clamp, extraction round-trip.
 python3 tests/test_sonicare_upg.py
 echo

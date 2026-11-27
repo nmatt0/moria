@@ -280,6 +280,7 @@ if(Python3_Interpreter_FOUND)
     test_cab
     test_cfbf
     test_vbf
+    test_vfw
     test_sonicare_upg
     test_uboot_env
     test_vbmeta
