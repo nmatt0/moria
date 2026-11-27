@@ -1,13 +1,14 @@
-// upg.cpp — ".upg" firmware container extraction. See upg.hpp.
+// sonicare_upg.cpp — Philips Sonicare ".upg" firmware container extraction.
 //
 // Re-reads payload_size (u32 LE @+0x08) and header_length (u16 LE @+0x0E)
 // directly rather than trusting any pre-parsed fields, matching this codebase's
 // other extractors. Writes header.bin / payload.bin / trailer.bin verbatim —
-// no decoding, since the payload's internal encoding (past its short plaintext
-// label) is unconfirmed.
-#include "extract/upg.hpp"
+// no decoding, since the payload is encrypted and the key lives on the
+// toothbrush MCU.
+#include "extract/sonicare_upg.hpp"
 
 #include <cstdint>
+#include <span>
 #include <vector>
 
 #include "extract/safepath.hpp"
@@ -18,10 +19,10 @@ namespace {
 constexpr size_t kTrailer = 16;
 }  // namespace
 
-bool extract_upg(const Reader& r, const Finding& f, SafeRoot& root, const std::string& subdir,
-                 Extracted& out) {
+bool extract_sonicare_upg(const Reader& r, const Finding& f, SafeRoot& root,
+                          const std::string& subdir, Extracted& out) {
     out.offset = f.offset;
-    out.type = "upg";
+    out.type = "sonicare_upg";
     out.root = subdir;
 
     auto header_length = r.at<uint16_t>(f.offset + 0x0E, Endian::Little);

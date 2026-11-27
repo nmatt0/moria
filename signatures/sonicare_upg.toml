@@ -1,0 +1,40 @@
+name = "sonicare_upg"
+category = "firmware"
+
+# Philips Sonicare ".upg" firmware update container (magic "\xFCUPH"). Found
+# bundled inside the Sonicare companion app APK at assets/firmware/<model>/.
+# Fixed 56-byte binary header, then a payload, then a 16-byte trailer:
+# header_length + payload_size + 16 == exact file size on every sample. The
+# payload opens with a 16-byte opaque prefix (nonce or digest, differs per
+# file), a constant 8-byte tag (01 00 14 01 02 00 00 00, byte-identical across
+# every sample), then a NUL-padded ASCII label (component name, e.g. a
+# bootloader stage) at payload offset 0x18. The bulk beyond that is
+# high-entropy (encrypted; no key material found in the companion app — the
+# decryption key lives on the toothbrush MCU).
+struct = """
+  bytes[4] magic;
+  u32 reserved;
+  u32 payload_size;
+  u16 format_version;
+  u16 header_length;
+"""
+
+constraints = [
+  "format_version == 1",
+  "header_length == 0x38",
+  "reserved == 0xFFFFFFFF",
+]
+
+validator = "sonicare_upg"
+
+[[magic]]
+hex = "fc555048"
+endian = "little"
+
+[doc]
+vendor = "Philips"
+description = "Philips Sonicare \".upg\" firmware container: 56-byte header + payload + 16-byte trailer, size-verified against EOF. Payload carries a short plaintext label then encrypted firmware (key resides on the toothbrush MCU, not in the companion app)."
+limitations = [
+  "Header bytes 0x10-0x37 and the 16-byte trailer are unidentified — no spec or reference implementation available.",
+  "No decryption key found in the companion app; the bulk of the payload cannot be decoded, only located.",
+]

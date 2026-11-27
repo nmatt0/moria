@@ -1029,12 +1029,13 @@ def vbf():
     return hdr + block(0x00FD0000, b0) + block(0x10000400, b1)
 
 
-def upg():
-    # ".upg" firmware container: 56-byte header (magic, reserved, payload_size,
-    # format_version=1, header_length=0x38, padding) then a payload (16-byte
-    # opaque prefix + constant 8-byte tag + NUL-padded ASCII label + filler)
-    # then a 16-byte trailer. header_length + payload_size + 16 landing exactly
-    # on EOF -> verified.
+def sonicare_upg():
+    # Philips Sonicare ".upg" firmware container: 56-byte header (magic,
+    # reserved=0xFFFFFFFF, payload_size, format_version=1, header_length=0x38,
+    # padding) then a payload (16-byte opaque prefix + constant 8-byte tag +
+    # NUL-padded ASCII label + filler) then a 16-byte trailer.
+    # header_length + payload_size + 16 landing exactly on EOF + tag match
+    # -> verified.
     payload = (bytes((i * 31 + 7) & 0xFF for i in range(16)) +   # opaque prefix
                bytes.fromhex("0100140102000000") +                # observed-constant tag
                b"TESTBOOT" + bytes(8) +                           # NUL-padded label
@@ -1509,7 +1510,7 @@ MANIFEST = [
     ("installer.msi", cfbf, "cfbf", VERIFIED),
     ("default.hv", wince_hive, "wince_hive", CONSISTENT),
     ("fw.vbf", vbf, "vbf", VERIFIED),
-    ("fw.upg", upg, "upg", VERIFIED),
+    ("fw.upg", sonicare_upg, "sonicare_upg", VERIFIED),
     ("android_magic_string.bin", android_magic_string, None, 0),
     ("android_magic_at_zero.bin", android_magic_at_zero, None, 0),
     ("jpeg_fp_soi.bin", jpeg_fp_soi, None, 0),
