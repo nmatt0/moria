@@ -1032,14 +1032,20 @@ def vbf():
 def sonicare_upg():
     # Philips Sonicare ".upg" firmware container: 56-byte header (magic,
     # reserved=0xFFFFFFFF, payload_size, format_version=1, header_length=0x38,
-    # padding) then a payload (16-byte opaque prefix + constant 8-byte tag +
-    # NUL-padded ASCII label + filler) then a 16-byte trailer.
+    # padding) then a payload then a 16-byte trailer. The payload opens with the
+    # format's 236-byte plaintext header: 16 opaque bytes, the constant 8-byte
+    # tag, three 64-byte NUL-padded ASCII fields, and a 12-byte component record.
     # header_length + payload_size + 16 landing exactly on EOF + tag match
     # -> verified.
-    payload = (bytes((i * 31 + 7) & 0xFF for i in range(16)) +   # opaque prefix
-               bytes.fromhex("0100140102000000") +                # observed-constant tag
-               b"TESTBOOT" + bytes(8) +                           # NUL-padded label
-               bytes((i * 197 + 13) & 0xFF for i in range(256)))  # filler
+    payload = (bytes((i * 31 + 7) & 0xFF for i in range(16)) +   # +0x00 opaque prefix
+               bytes.fromhex("0100140102000000") +                # +0x10 observed-constant tag
+               b"TESTBOOT".ljust(64, b"\x00") +                   # +0x18 name (the label)
+               b"TESTBOOT Connected".ljust(64, b"\x00") +         # +0x58
+               b"application FW".ljust(64, b"\x00") +             # +0x98
+               struct.pack("<II", 1, 0x1000) +                    # +0xd8 flag, unidentified u32
+               b"boot2nd".ljust(8, b"\x00") +                     # +0xe0 component name
+               struct.pack("<I", 1) +                             # +0xe8
+               bytes((i * 197 + 13) & 0xFF for i in range(256)))  # +0xec stand-in ciphertext
     header = (b"\xFCUPH" + b"\xFF\xFF\xFF\xFF" +
               struct.pack("<I", len(payload)) +
               struct.pack("<HH", 1, 0x38) +

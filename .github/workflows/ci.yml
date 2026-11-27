@@ -58,10 +58,11 @@ jobs:
         run: python3 tests/test_samples.py
       - name: Extraction round-trips
         run: python3 tests/test_extract.py
-      - name: RFP + VBF round-trips
+      - name: RFP + VBF + Sonicare UPG round-trips
         run: |
           python3 tests/test_rae_rfp.py
           python3 tests/test_vbf.py
+          python3 tests/test_sonicare_upg.py
 
   sanitizers:
     name: asan + ubsan
@@ -93,6 +94,7 @@ jobs:
           ./build/moria_unit
           python3 tests/test_samples.py
           python3 tests/test_extract.py
+          python3 tests/test_sonicare_upg.py
 
   fuzz-smoke:
     name: fuzz smoke (60s)

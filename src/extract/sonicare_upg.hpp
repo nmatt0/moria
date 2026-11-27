@@ -1,8 +1,10 @@
 // sonicare_upg.hpp — Philips Sonicare ".upg" firmware container extractor.
 //
 // Splits the container into its three structural pieces: header.bin (fixed,
-// header_length bytes), payload.bin (payload_size bytes — encrypted, key on
-// MCU), and trailer.bin (16 bytes, unidentified). No decryption is attempted.
+// header_length bytes), payload.bin (payload_size bytes, encrypted past its
+// 236-byte plaintext header, key on the MCU), and trailer.bin (16 bytes,
+// unidentified). Adds a sonicare_upg-info.txt sidecar serializing that
+// plaintext header. No decryption is attempted.
 #pragma once
 
 #include <string>
