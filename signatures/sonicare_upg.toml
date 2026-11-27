@@ -1,0 +1,66 @@
+name = "sonicare_upg"
+category = "firmware"
+
+# Philips Sonicare ".upg" firmware update container (magic "\xFCUPH"). Found
+# bundled inside the Sonicare companion app APK at assets/firmware/<model>/.
+# Fixed 56-byte binary header, then a payload, then a 16-byte trailer:
+# header_length + payload_size + 16 == exact file size on every sample.
+#
+# The payload opens with a 236-byte plaintext header, confirmed byte-for-byte
+# consistent across every sample seen:
+#
+#   +0x00   16 B  opaque, differs per file (nonce or digest, undetermined)
+#   +0x10    8 B  constant tag 01 00 14 01 02 00 00 00 (meaning unknown)
+#   +0x18   64 B  NUL-padded ASCII device/product name ("Philips Sonicare
+#                 HX99XX" on unfilled builds)
+#   +0x58   64 B  NUL-padded ASCII ("product version" on unfilled builds)
+#   +0x98   64 B  NUL-padded ASCII ("component name" on unfilled builds)
+#   +0xd8    4 B  u32, observed 0 or 1
+#   +0xdc    4 B  u32, unidentified (8360 .. 24846; matches no length in the
+#                 container)
+#   +0xe0    8 B  NUL-padded ASCII component name, "boot2nd" on all samples
+#   +0xe8    4 B  u32, 1 on all samples
+#   +0xec   ...   encrypted firmware to the end of the payload (entropy ~8.0)
+#
+# No decryption key is present in the companion app; the key lives on the
+# toothbrush MCU, so the body can be located but not decoded. The 16-byte
+# trailer is most likely a MAC over that body: it is not a digest or CRC32 of
+# any region of the container (checked md5/sha1/sha256/crc32 against six
+# candidate ranges on all six samples, no match).
+struct = """
+  bytes[4] magic;
+  u32 reserved;
+  u32 payload_size;
+  u16 format_version;
+  u16 header_length;
+"""
+
+constraints = [
+  "format_version == 1",
+  "header_length == 0x38",
+  "reserved == 0xFFFFFFFF",
+]
+
+# A real container always carries the full 236-byte plaintext payload header, so
+# a smaller payload is a header field out of range rather than a real container.
+# Soft, not hard: the bytes alone cannot prove no stripped-down variant exists,
+# and a magic-tier hit with no size claim is more useful than silence.
+soft_constraints = [
+  "payload_size >= 0xec",
+]
+soft_evidence = "magic + header fields present; payload_size too small for the plaintext payload header"
+
+validator = "sonicare_upg"
+
+[[magic]]
+hex = "fc555048"
+endian = "little"
+
+[doc]
+vendor = "Philips"
+description = "Philips Sonicare \".upg\" firmware container: 56-byte header + payload + 16-byte trailer, size-verified against EOF and confirmed by a constant 8-byte tag. The payload opens with a 236-byte plaintext header (three NUL-padded ASCII name fields plus a component record) and the firmware body after it is encrypted, with the key on the toothbrush MCU rather than in the companion app."
+limitations = [
+  "Header bytes 0x10-0x37 and the 16-byte trailer are unidentified. No spec or reference implementation is available.",
+  "No decryption key found in the companion app; the firmware body past payload offset 0xec cannot be decoded, only located.",
+  "The u32 at payload offset 0xdc is unidentified; it matches no length in the container.",
+]

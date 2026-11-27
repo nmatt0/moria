@@ -31,6 +31,7 @@
 #include "validators/ubi.hpp"
 #include "validators/uefi_fv.hpp"
 #include "validators/uimage.hpp"
+#include "validators/sonicare_upg.hpp"
 #include "validators/upx.hpp"
 #include "validators/xz.hpp"
 #include "validators/vbf.hpp"
@@ -67,6 +68,7 @@ Validator find_validator(const std::string& name) {
     if (name == "wince_rom") return validate_wince_rom;
     if (name == "wince_hive") return validate_wince_hive;
     if (name == "vbf") return validate_vbf;
+    if (name == "sonicare_upg") return validate_sonicare_upg;
     if (name == "upx") return validate_upx;
     if (name == "xz") return validate_xz;
     if (name == "verity") return validate_verity;
