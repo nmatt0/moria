@@ -1029,6 +1029,29 @@ def vbf():
     return hdr + block(0x00FD0000, b0) + block(0x10000400, b1)
 
 
+def vfw():
+    # VFW firmware container: 16-byte header (8-byte ASCII magic, u32 LE
+    # payload_size, u32 LE CRC-32 over payload) then raw firmware payload.
+    # CRC-32 verified over payload -> verified.
+    payload = bytes((i * 7 + 3) & 0xFF for i in range(512))
+    crc = zlib.crc32(payload) & 0xFFFFFFFF
+    header = b"VFWMCUF1" + struct.pack("<II", len(payload), crc)
+    return header + payload
+
+
+def sonicare_upg():
+    payload = (bytes((i * 31 + 7) & 0xFF for i in range(16)) +   # opaque prefix
+               bytes.fromhex("0100140102000000") +                # observed-constant tag
+               b"TESTBOOT" + bytes(8) +                           # NUL-padded label
+               bytes((i * 197 + 13) & 0xFF for i in range(256)))  # filler
+    header = (b"\xFCUPH" + b"\xFF\xFF\xFF\xFF" +
+              struct.pack("<I", len(payload)) +
+              struct.pack("<HH", 1, 0x38) +
+              bytes(0x38 - 16))
+    trailer = bytes((i * 53 + 1) & 0xFF for i in range(16))
+    return header + payload + trailer
+
+
 def random_blob():
     # deterministic pseudo-random, no known magic
     return bytes((i * 37 + 11) & 0xFF for i in range(2048))
@@ -1491,6 +1514,8 @@ MANIFEST = [
     ("installer.msi", cfbf, "cfbf", VERIFIED),
     ("default.hv", wince_hive, "wince_hive", CONSISTENT),
     ("fw.vbf", vbf, "vbf", VERIFIED),
+    ("fw.vfw", vfw, "vfw", VERIFIED),
+    ("fw.upg", sonicare_upg, "sonicare_upg", VERIFIED),
     ("android_magic_string.bin", android_magic_string, None, 0),
     ("android_magic_at_zero.bin", android_magic_at_zero, None, 0),
     ("jpeg_fp_soi.bin", jpeg_fp_soi, None, 0),

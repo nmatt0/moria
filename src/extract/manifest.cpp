@@ -39,9 +39,11 @@
 #include "extract/uboot_env.hpp"
 #include "extract/esp32_nvs.hpp"
 #include "extract/uimage.hpp"
+#include "extract/sonicare_upg.hpp"
 #include "extract/upx.hpp"
 #include "extract/vbf.hpp"
 #include "extract/vbmeta.hpp"
+#include "extract/vfw.hpp"
 #include "extract/wince_hive.hpp"
 #include "extract/wince_rom.hpp"
 #include "extract/fit.hpp"
@@ -81,6 +83,8 @@ Extractor find_extractor(const std::string& type) {
     if (type == "wince_rom") return extract_wince_rom;
     if (type == "wince_hive") return extract_wince_hive;
     if (type == "vbf") return extract_vbf;
+    if (type == "vfw") return extract_vfw;
+    if (type == "sonicare_upg") return extract_sonicare_upg;
     if (type == "vbmeta") return extract_vbmeta;
     if (type == "upx") return extract_upx;
     if (type == "fit") return extract_fit;
