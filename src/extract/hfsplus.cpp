@@ -2,9 +2,9 @@
 //
 // All multi-byte fields are big-endian. Layout:
 //  - Volume Header @ base+1024: signature 'H+'(0x482B)/'HX'(0x4858), blockSize @40,
-//    totalBlocks @44, and the special-file forks (catalogFile @272). A fork is a
-//    HFSPlusForkData: logicalSize(u64), clumpSize(u32), totalBlocks(u32), then 8
-//    extents {startBlock(u32), blockCount(u32)}.
+//    totalBlocks @44, and the special-file forks (extentsOverflowFile @192,
+//    catalogFile @272). A fork is a HFSPlusForkData: logicalSize(u64), clumpSize(u32),
+//    totalBlocks(u32), then 8 extents {startBlock(u32), blockCount(u32)}.
 //  - Catalog File: a B-tree. Node 0 is the header node; its BTHeaderRec gives the
 //    node size and the first leaf node. Leaf nodes form a forward-linked chain
 //    (BTNodeDescriptor.fLink), so every catalog record is reachable by walking the
@@ -14,17 +14,24 @@
 //  - A file record's data fork (@88 in the record) has the file's extents; a folder
 //    record's folderID(@8) is its CNID. The tree is rebuilt from the root folder
 //    (CNID 2) by grouping records on their parent CNID.
+//  - Extents Overflow File: a B-tree holding the 9th-and-later extents of any fork
+//    too fragmented to fit the 8 inline extents a catalog record carries. Keyed by
+//    {forkType(u8), fileID(u32), startBlock(u32)}; without it a fragmented file (or
+//    a fragmented catalog) is silently truncated. Parsed up front so forks read past
+//    their inline extents.
 #include "extract/hfsplus.hpp"
 
 #include "byteorder.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <map>
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "extract/safepath.hpp"
@@ -36,18 +43,25 @@ namespace {
 constexpr uint16_t SIG_HFSPLUS = 0x482B;  // 'H+'
 constexpr uint16_t SIG_HFSX = 0x4858;     // 'HX'
 constexpr uint32_t ROOT_CNID = 2;
+constexpr uint32_t CATALOG_FILE_CNID = 4;  // kHFSCatalogFileID (the catalog fork's own CNID)
+
+constexpr uint8_t FORK_DATA = 0x00;      // HFSPlusExtentKey.forkType for the data fork
+constexpr uint8_t FORK_RESOURCE = 0xFF;  // ... and the resource fork
+constexpr uint16_t UF_COMPRESSED = 0x0020;  // ownerFlags bit: contents live in decmpfs, not the data fork
 
 constexpr uint16_t REC_FOLDER = 1;
 constexpr uint16_t REC_FILE = 2;
 
-constexpr uint16_t S_IFMT_ = 0170000;
-constexpr uint16_t S_IFLNK_ = 0120000;
-constexpr uint16_t S_IFDIR_ = 0040000;
+constexpr size_t S_IFMT_ = 0170000;
+constexpr size_t S_IFLNK_ = 0120000;
+constexpr size_t S_IFDIR_ = 0040000;
 
-constexpr size_t MAX_CATALOG_BYTES = size_t(512) << 20;  // 512 MiB catalog cap
+constexpr size_t MAX_CATALOG_BYTES = size_t(512) << 20;   // 512 MiB catalog cap
+constexpr size_t MAX_OVERFLOW_BYTES = size_t(256) << 20;  // 256 MiB extents-overflow cap
 constexpr uint64_t MAX_FILE_BYTES = uint64_t(8) << 30;
 constexpr size_t MAX_RECORDS = 4000000;
 constexpr size_t MAX_DEPTH = 128;
+constexpr size_t MAX_EXTENTS_PER_FORK = 8192;  // inline + overflow, per fork (bounds a hostile chain)
 
 std::optional<uint16_t> u16(const Reader& r, uint64_t o) { return r.at<uint16_t>(o, Endian::Big); }
 std::optional<uint32_t> u32(const Reader& r, uint64_t o) { return r.at<uint32_t>(o, Endian::Big); }
@@ -132,8 +146,10 @@ struct Node {
     uint32_t parent = 0;
     uint32_t cnid = 0;
     bool is_dir = false;
+    bool compressed = false;       // file: ownerFlags & UF_COMPRESSED (decmpfs)
     uint16_t mode = 0;             // file: permissions.fileMode (for symlink detect)
     uint64_t data_size = 0;        // file: data-fork logical size
+    uint64_t rsrc_size = 0;        // file: resource-fork logical size
     Extent extents[8]{};           // file: data-fork inline extents
 };
 
@@ -145,19 +161,25 @@ struct Ctx {
     SafeRoot& root;
     std::string subdir;
     Extracted& out;
-    std::vector<uint8_t> catalog;                    // the whole catalog fork
+    std::vector<uint8_t> catalog;                       // the whole catalog fork
     std::map<uint32_t, std::vector<size_t>> by_parent;  // parent CNID -> node indices
     std::vector<Node> nodes;
     std::set<uint32_t> visited;
+    // Extents Overflow: (forkType,fileID) -> (fork-relative startBlock -> 8 extents).
+    std::map<std::pair<uint8_t, uint32_t>, std::map<uint32_t, std::array<Extent, 8>>> overflow;
     bool truncated = false;
+    bool hit_limit = false;        // stopped because the caller's byte/file budget was reached
+    size_t n_truncated = 0;        // files whose data could not be fully read
+    size_t n_compressed = 0;       // files stored with decmpfs (written without contents)
+    size_t n_resource = 0;         // files carrying a resource fork (not extracted)
 };
 
-// Read a fork's extents (in `blob`) into a contiguous byte buffer up to `want`.
-bool read_extents(Ctx& c, const Extent* ext, int n, uint64_t want, std::vector<uint8_t>& out) {
+// Read a run of extents into a contiguous byte buffer up to `want`.
+bool read_extents(Ctx& c, const Extent* ext, size_t n, uint64_t want, std::vector<uint8_t>& out) {
     out.clear();
     if (want > MAX_FILE_BYTES) { c.truncated = true; want = MAX_FILE_BYTES; }
     out.reserve(static_cast<size_t>(std::min<uint64_t>(want, MAX_CATALOG_BYTES)));
-    for (int i = 0; i < n && out.size() < want; ++i) {
+    for (size_t i = 0; i < n && out.size() < want; ++i) {
         if (ext[i].count == 0) continue;
         // guard against absurd extents pointing outside the volume
         if (uint64_t(ext[i].start) + ext[i].count > c.vol_blocks && c.vol_blocks) {
@@ -182,6 +204,92 @@ void read_fork_extents(const Reader& r, uint64_t o, Extent* ext) {
         auto n = u32(r, o + 16 + i * 8 + 4);
         ext[i].start = s ? *s : 0;
         ext[i].count = n ? *n : 0;
+    }
+}
+
+// Build the full extent list of a fork: its 8 inline extents, then any further
+// extents from the Extents Overflow B-tree, until `logical` bytes are covered.
+// Without the overflow lookup a fork fragmented past 8 extents stops at the 8th.
+std::vector<Extent> full_extents(Ctx& c, uint8_t fork_type, uint32_t file_id, const Extent* inln,
+                                 uint64_t logical) {
+    std::vector<Extent> ex;
+    const uint64_t need = c.block_size ? (logical + c.block_size - 1) / c.block_size : 0;
+    uint64_t have = 0;
+    for (int i = 0; i < 8 && have < need; ++i) {
+        if (inln[i].count == 0) continue;
+        ex.push_back(inln[i]);
+        have += inln[i].count;
+    }
+    if (have >= need) return ex;
+    auto it = c.overflow.find({fork_type, file_id});
+    if (it == c.overflow.end()) return ex;  // fragmented but no overflow record: caller truncates
+    const auto& by_start = it->second;
+    // Overflow records are keyed by the fork-relative start block of their first
+    // extent, so continue from wherever the inline extents left off.
+    while (have < need && ex.size() < MAX_EXTENTS_PER_FORK) {
+        if (have > 0xFFFFFFFFull) break;
+        auto rit = by_start.find(static_cast<uint32_t>(have));
+        if (rit == by_start.end()) break;
+        bool progressed = false;
+        for (const Extent& e : rit->second) {
+            if (e.count == 0) continue;
+            ex.push_back(e);
+            have += e.count;
+            progressed = true;
+            if (have >= need) break;
+        }
+        if (!progressed) break;
+    }
+    return ex;
+}
+
+// Parse the Extents Overflow B-tree leaf chain into c.overflow. `buf` is the
+// overflow file fork. Records: HFSPlusExtentKey {keyLength(u16)=10, forkType(u8),
+// pad(u8), fileID(u32), startBlock(u32)} then a HFSPlusExtentRecord of 8 extents.
+void parse_overflow(Ctx& c, const std::vector<uint8_t>& buf) {
+    if (buf.size() < 14 + 20) return;
+    auto be16 = [&](size_t p) -> uint32_t { return load_be16(buf, p); };
+    auto be32 = [&](size_t p) -> uint32_t { return load_be32(buf, p); };
+    const uint32_t first_leaf = be32(14 + 10);
+    const uint32_t node_size = be16(14 + 18);
+    if (node_size < 512 || (node_size & (node_size - 1)) != 0) return;
+    const uint32_t total_nodes = static_cast<uint32_t>(buf.size() / node_size);
+    std::set<uint32_t> seen;
+    uint32_t node = first_leaf;
+    size_t records = 0;
+    while (node != 0 && node < total_nodes && records < MAX_RECORDS) {
+        if (!seen.insert(node).second) break;  // cycle guard
+        const size_t nbase = size_t(node) * node_size;
+        const uint32_t flink = be32(nbase);
+        const int8_t kind = static_cast<int8_t>(buf[nbase + 8]);
+        const uint16_t num = static_cast<uint16_t>((uint32_t(buf[nbase + 10]) << 8) | buf[nbase + 11]);
+        if (kind == -1) {  // kBTLeafNode
+            for (uint16_t i = 0; i < num; ++i) {
+                const size_t off_pos = nbase + node_size - 2 * (i + 1);
+                const size_t nxt_pos = nbase + node_size - 2 * (i + 2);
+                if (off_pos + 2 > buf.size() || nxt_pos + 2 > buf.size()) break;
+                const uint16_t roff = static_cast<uint16_t>((uint32_t(buf[off_pos]) << 8) | buf[off_pos + 1]);
+                const uint16_t rnext = static_cast<uint16_t>((uint32_t(buf[nxt_pos]) << 8) | buf[nxt_pos + 1]);
+                if (roff < 14 || roff >= node_size || rnext <= roff) continue;
+                const size_t rp = nbase + roff;
+                if (rp + 2 + 10 + 64 > buf.size()) continue;
+                const uint32_t key_len = be16(rp);
+                if (key_len < 10) continue;
+                const uint8_t fork_type = buf[rp + 2];
+                const uint32_t file_id = be32(rp + 4);
+                const uint32_t start_block = be32(rp + 8);
+                const size_t data_off = rp + 2 + key_len;
+                if (data_off + 64 > buf.size()) continue;
+                std::array<Extent, 8> rec{};
+                for (int e = 0; e < 8; ++e) {
+                    rec[e].start = be32(data_off + e * 8);
+                    rec[e].count = be32(data_off + e * 8 + 4);
+                }
+                c.overflow[{fork_type, file_id}][start_block] = rec;
+                ++records;
+            }
+        }
+        node = flink;
     }
 }
 
@@ -213,15 +321,18 @@ void parse_record(Ctx& c, size_t rp, size_t rlen) {
         c.by_parent[parent].push_back(c.nodes.size());
         c.nodes.push_back(std::move(n));
     } else if (rec_type == REC_FILE) {
-        // HFSPlusCatalogFile: fileID@8, permissions.fileMode@42, dataFork@88.
-        if (data_off + 88 + 80 > cat.size()) return;
+        // HFSPlusCatalogFile: fileID@8, ownerFlags@41, permissions.fileMode@42,
+        // dataFork@88, resourceFork@168 (each a HFSPlusForkData).
+        if (data_off + 168 + 80 > cat.size()) return;
         Node n;
         n.name = std::move(name);
         n.parent = parent;
         n.cnid = be32(data_off + 8);
         n.is_dir = false;
+        n.compressed = (be16(data_off + 40) & UF_COMPRESSED) != 0;  // adminFlags@40,ownerFlags@41
         n.mode = static_cast<uint16_t>(be16(data_off + 42));
         n.data_size = (uint64_t(be32(data_off + 88)) << 32) | be32(data_off + 92);
+        n.rsrc_size = (uint64_t(be32(data_off + 168)) << 32) | be32(data_off + 172);
         const size_t fork = data_off + 88;
         for (int i = 0; i < 8; ++i) {
             n.extents[i].start = be32(fork + 16 + i * 8);
@@ -265,30 +376,51 @@ void collect_records(Ctx& c, uint32_t node_size, uint32_t first_leaf) {
     }
 }
 
+// HFS+ allows '/' in a name (the POSIX layer shows it as ':'). Keep it a single
+// path component by swapping '/' -> ':' rather than dropping the record (which
+// would discard a whole subtree if the name is a directory's).
+std::string sanitize_component(std::string name) {
+    std::replace(name.begin(), name.end(), '/', ':');
+    return name;
+}
+
 void walk(Ctx& c, uint32_t cnid, const std::string& rel, size_t depth) {
     if (depth > MAX_DEPTH) { c.truncated = true; return; }
     if (!c.visited.insert(cnid).second) return;  // cycle guard on CNID
     auto it = c.by_parent.find(cnid);
     if (it == c.by_parent.end()) return;
     for (size_t idx : it->second) {
+        // Stop within this filesystem too once the run-wide byte/file budget is
+        // reached, so a single huge volume cannot blow past --max-bytes/--max-files.
+        if ((c.out.limit_files && c.out.files >= c.out.limit_files) ||
+            (c.out.limit_bytes && c.out.bytes >= c.out.limit_bytes)) {
+            c.hit_limit = true;
+            c.truncated = true;
+            return;
+        }
         const Node& n = c.nodes[idx];
         if (n.name.empty() || n.name == "." || n.name == "..") continue;
-        if (n.name.find('/') != std::string::npos) continue;  // never split a name
-        const std::string child = rel.empty() ? n.name : rel + "/" + n.name;
+        const std::string name = sanitize_component(n.name);
+        const std::string child = rel.empty() ? name : rel + "/" + name;
         const std::string full = c.subdir + "/" + child;
         if (n.is_dir) {
             if (c.root.make_dir(full)) c.out.dirs++;
             walk(c, n.cnid, child, depth + 1);
         } else if ((n.mode & S_IFMT_) == S_IFLNK_) {
+            std::vector<Extent> ex = full_extents(c, FORK_DATA, n.cnid, n.extents, n.data_size);
             std::vector<uint8_t> data;
-            read_extents(c, n.extents, 8, n.data_size, data);
+            read_extents(c, ex.data(), ex.size(), n.data_size, data);
             std::string target(data.begin(), data.end());
             if (!target.empty() && target.find('\0') == std::string::npos &&
                 c.root.make_symlink(full, target))
                 c.out.symlinks++;
         } else {
+            std::vector<Extent> ex = full_extents(c, FORK_DATA, n.cnid, n.extents, n.data_size);
             std::vector<uint8_t> data;
-            read_extents(c, n.extents, 8, n.data_size, data);
+            read_extents(c, ex.data(), ex.size(), n.data_size, data);
+            if (data.size() < n.data_size) c.n_truncated++;
+            if (n.compressed) c.n_compressed++;  // data fork is empty; contents live in decmpfs
+            if (n.rsrc_size) c.n_resource++;      // resource fork is not extracted
             const uint32_t mode = (n.mode & 0777) ? (n.mode & 0777) : 0644;
             if (c.root.write_file(full, data, mode)) {
                 c.out.files++;
@@ -324,16 +456,35 @@ bool extract_hfsplus(const Reader& r, const Finding& f, SafeRoot& root, const st
         return true;
     }
 
-    Ctx c{r, f.offset, block_size, *tblocks, root, subdir, out, {}, {}, {}, {}, false};
+    Ctx c{r,  f.offset, block_size, *tblocks, root,  subdir, out, {}, {}, {}, {}, {},
+          {}, false,    0,          0,        0};
+
+    // Extents Overflow File fork @ VH+192. Parse it first so fragmented forks
+    // (including the catalog fork itself) can read past their 8 inline extents.
+    // Its own fork is read inline-only — a special file past 8 extents is rare and
+    // cannot be bootstrapped from the tree it lives in.
+    const uint64_t ovf_fork = vh + 192;
+    if (auto ovf_logical = u64(r, ovf_fork); ovf_logical && *ovf_logical) {
+        Extent ovf_ext[8];
+        read_fork_extents(r, ovf_fork, ovf_ext);
+        std::vector<uint8_t> ovf_buf;
+        uint64_t want = std::min<uint64_t>(*ovf_logical, MAX_OVERFLOW_BYTES);
+        if (read_extents(c, ovf_ext, 8, want, ovf_buf)) parse_overflow(c, ovf_buf);
+        c.truncated = false;  // a short overflow read is not itself file-data loss
+    }
 
     // Catalog File fork lives at volume-header offset 272.
     const uint64_t cat_fork = vh + 272;
     auto cat_logical = u64(r, cat_fork);
     if (!cat_logical || *cat_logical == 0) { out.status = "error:no-catalog"; return true; }
-    Extent cat_ext[8];
-    read_fork_extents(r, cat_fork, cat_ext);
+    Extent cat_inline[8];
+    read_fork_extents(r, cat_fork, cat_inline);
     uint64_t want = std::min<uint64_t>(*cat_logical, MAX_CATALOG_BYTES);
-    if (!read_extents(c, cat_ext, 8, want, c.catalog) || c.catalog.size() < 32 + 14) {
+    // The catalog fork can itself be fragmented past 8 extents; resolve it through
+    // the overflow tree so leaf records (whole files/dirs) are not lost.
+    std::vector<Extent> cat_ext = full_extents(c, FORK_DATA, CATALOG_FILE_CNID, cat_inline, want);
+    if (!read_extents(c, cat_ext.data(), cat_ext.size(), want, c.catalog) ||
+        c.catalog.size() < 32 + 14) {
         out.status = "error:catalog-read";
         return true;
     }
@@ -352,7 +503,21 @@ bool extract_hfsplus(const Reader& r, const Finding& f, SafeRoot& root, const st
     collect_records(c, node_size, first_leaf);
     walk(c, ROOT_CNID, "", 0);
 
-    out.status = c.truncated ? "partial" : "ok";
+    // Explain an incomplete result: a bare "partial" hides which files lost data.
+    out.hit_limit = c.hit_limit;
+    if (c.hit_limit) out.warnings.push_back("stopped at the extraction size/file limit");
+    if (c.n_truncated)
+        out.warnings.push_back(std::to_string(c.n_truncated) +
+                               " file(s) truncated: data extents could not be read");
+    if (c.n_compressed)
+        out.warnings.push_back(std::to_string(c.n_compressed) +
+                               " file(s) use HFS+ compression (decmpfs) and were written empty");
+    if (c.n_resource)
+        out.warnings.push_back(std::to_string(c.n_resource) +
+                               " file(s) carry a resource fork that was not extracted");
+
+    const bool incomplete = c.truncated || c.n_truncated || c.n_compressed || c.n_resource;
+    out.status = incomplete ? "partial" : "ok";
     return true;
 }
 
